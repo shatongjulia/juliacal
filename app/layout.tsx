@@ -1,34 +1,28 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import type { Metadata } from 'next'
+import './globals.css'
+import BottomNav from '@/components/BottomNav'
 
 export const metadata: Metadata = {
-  title: "JuliaCal - 卡路里追踪",
-  description: "AI 驱动的卡路里追踪应用",
-};
+  title: 'JuliaCal - 饮食热量追踪',
+  description: '记录每日饮食，追踪热量与营养',
+}
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
+    <html lang="zh">
+      <body className="bg-gray-50 min-h-screen">
+        <BottomNav />
+        {/* 移动端底部 padding，桌面端左侧 padding */}
+        <main className="pb-20 md:pb-0 md:ml-60 min-h-screen">
+          <div className="max-w-3xl mx-auto px-4 py-6">
+            {children}
+          </div>
+        </main>
       </body>
     </html>
-  );
+  )
 }

@@ -9,12 +9,13 @@ interface CircularProgressProps {
 export default function CircularProgress({ current, target, size = 180 }: CircularProgressProps) {
   const radius = (size - 20) / 2
   const circumference = 2 * Math.PI * radius
-  const ratio = target > 0 ? Math.min(current / target, 1) : 0
-  const offset = circumference * (1 - ratio)
+  const actualRatio = target > 0 ? current / target : 0
+  const clampedRatio = Math.min(actualRatio, 1)
+  const offset = circumference * (1 - clampedRatio)
 
   const color =
-    ratio > 1 ? '#ef4444' :
-    ratio >= 0.8 ? '#f59e0b' :
+    actualRatio > 1 ? '#ef4444' :
+    actualRatio >= 0.8 ? '#f59e0b' :
     '#22c55e'
 
   return (

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { Suspense, useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Search, X } from 'lucide-react'
 import { MealType, MealEntry, FoodCategory } from '@/lib/types'
@@ -33,7 +33,7 @@ const CATEGORY_LABELS: Record<FoodCategory, string> = {
   other: '其他',
 }
 
-export default function SearchPage() {
+function SearchPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const meal = (searchParams.get('meal') || 'breakfast') as MealType
@@ -298,5 +298,13 @@ export default function SearchPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen text-gray-400">加载中...</div>}>
+      <SearchPageContent />
+    </Suspense>
   )
 }

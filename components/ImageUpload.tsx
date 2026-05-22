@@ -25,8 +25,11 @@ export default function ImageUpload({ onResult, onError, disabled }: ImageUpload
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleFile = async (file: File) => {
-    const SUPPORTED = ['image/jpeg', 'image/png', 'image/webp']
-    if (!SUPPORTED.includes(file.type)) {
+    // 通过扩展名或 MIME type 判断是否为图片
+    const ext = file.name.split('.').pop()?.toLowerCase() || ''
+    const validExts = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif']
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']
+    if (!validExts.includes(ext) && file.type && !validTypes.includes(file.type)) {
       onError('请上传 JPEG、PNG 或 WebP 格式的图片')
       return
     }
@@ -62,7 +65,8 @@ export default function ImageUpload({ onResult, onError, disabled }: ImageUpload
       <input
         ref={inputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/*"
+        capture="environment"
         className="hidden"
         onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
       />

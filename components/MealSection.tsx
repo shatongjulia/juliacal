@@ -43,23 +43,35 @@ export default function MealSection({ mealType, entries, date, onUpdate }: MealS
   }
 
   const handleCameraResult = (foods: AnalyzedFood[]) => {
-    const log = getDailyLog(date)
-    const newEntries: MealEntry[] = foods.map(f => ({
-      id: crypto.randomUUID(),
-      name: f.name,
-      calories: f.calories,
-      carbs: f.carbs,
-      protein: f.protein,
-      fat: f.fat,
-      amount: f.estimatedWeight,
-      foodCategory: f.category as FoodCategory,
-      source: 'camera' as const,
-      createdAt: new Date().toISOString(),
-    }))
-    log.meals[mealType] = [...log.meals[mealType], ...newEntries]
-    saveDailyLog(log)
-    onUpdate()
-    showToast(`已添加 ${foods.length} 项食物`)
+    try {
+      const log = getDailyLog(date)
+      const newEntries: MealEntry[] = foods.map(f => {
+        let id: string
+        try {
+          id = crypto.randomUUID()
+        } catch {
+          id = 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10)
+        }
+        return {
+          id,
+          name: f.name,
+          calories: f.calories,
+          carbs: f.carbs,
+          protein: f.protein,
+          fat: f.fat,
+          amount: f.estimatedWeight,
+          foodCategory: f.category as FoodCategory,
+          source: 'camera' as const,
+          createdAt: new Date().toISOString(),
+        }
+      })
+      log.meals[mealType] = [...log.meals[mealType], ...newEntries]
+      saveDailyLog(log)
+      onUpdate()
+      showToast(`已添加 ${foods.length} 项食物`)
+    } catch (e) {
+      showToast('添加失败，请重试')
+    }
   }
 
   return (

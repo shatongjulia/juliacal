@@ -113,31 +113,35 @@ export default function OnboardingPage() {
 
   const handleSubmit = () => {
     if (!form.gender || !form.activityLevel || !form.goal) return
-    const targets = buildUserTargets({
-      gender: form.gender as 'male' | 'female',
-      age: Number(form.age),
-      height: Number(form.height),
-      weight: Number(form.weight),
-      activityLevel: form.activityLevel as ActivityLevel,
-      goal: form.goal as Goal,
-    })
-    const settings: UserSettings = {
-      version: 1,
-      name: form.name.trim(),
-      gender: form.gender as 'male' | 'female',
-      age: Number(form.age),
-      height: Number(form.height),
-      weight: Number(form.weight),
-      activityLevel: form.activityLevel as ActivityLevel,
-      goal: form.goal as Goal,
-      dailyCalorieTarget: targets.dailyCalorieTarget,
-      dailyCarbTarget: targets.dailyCarbTarget,
-      dailyProteinTarget: targets.dailyProteinTarget,
-      dailyFatTarget: targets.dailyFatTarget,
-      onboardingComplete: true,
+    try {
+      const targets = buildUserTargets({
+        gender: form.gender as 'male' | 'female',
+        age: Number(form.age),
+        height: Number(form.height),
+        weight: Number(form.weight),
+        activityLevel: form.activityLevel as ActivityLevel,
+        goal: form.goal as Goal,
+      })
+      const settings: UserSettings = {
+        version: 1,
+        name: form.name.trim(),
+        gender: form.gender as 'male' | 'female',
+        age: Number(form.age),
+        height: Number(form.height),
+        weight: Number(form.weight),
+        activityLevel: form.activityLevel as ActivityLevel,
+        goal: form.goal as Goal,
+        dailyCalorieTarget: targets.dailyCalorieTarget,
+        dailyCarbTarget: targets.dailyCarbTarget,
+        dailyProteinTarget: targets.dailyProteinTarget,
+        dailyFatTarget: targets.dailyFatTarget,
+        onboardingComplete: true,
+      }
+      saveSettings(settings)
+      router.push('/')
+    } catch {
+      setErrors({ goal: '保存失败，请重试' })
     }
-    saveSettings(settings)
-    router.push('/')
   }
 
   return (

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { getSettings, getRecentLogs } from '@/lib/storage'
 import { UserSettings, DailyLog, MealType } from '@/lib/types'
 import { evaluate211 } from '@/lib/diet211'
+import { Moon } from 'lucide-react'
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner']
 
@@ -45,7 +46,8 @@ export default function ProgressPage() {
   }
 
   const weekDays = getWeekDays()
-  const weekLogs = weekDays.map(date => logs.find(l => l.date === date) || { date, meals: { breakfast: [], lunch: [], dinner: [], snack: [] } })
+  const emptyLog = (date: string): DailyLog => ({ date, meals: { breakfast: [], lunch: [], dinner: [], snack: [] }, water: 0, mealTimes: { breakfast: null, lunch: null, dinner: null, snack: null } })
+  const weekLogs = weekDays.map(date => logs.find(l => l.date === date) || emptyLog(date))
 
   const weekCalories = weekLogs.map(log => ({
     date: log.date,
@@ -72,7 +74,7 @@ export default function ProgressPage() {
 
   // 今日211达标
   const todayDate = new Date().toISOString().split('T')[0]
-  const todayLog = logs.find(l => l.date === todayDate) || { date: todayDate, meals: { breakfast: [], lunch: [], dinner: [], snack: [] } }
+  const todayLog = logs.find(l => l.date === todayDate) || emptyLog(todayDate)
   const today211 = MEAL_TYPES.filter(m => {
     const entries = todayLog.meals[m]
     if (entries.length < 2) return false
@@ -80,6 +82,32 @@ export default function ProgressPage() {
     return result?.compliant ?? false
   }).length
 
+  // 饮水
+  const weekAvgWater = Math.round(weekLogs.reduce((s, l) => s + l.water, 0) / daysWithData)
+  const waterPct = Math.round(Math.min(weekAvgWater / settings.dailyWaterTarget, 1) * 100)
+
+  // 夜晚空腹时间（早餐 - 前一天晚餐）
+  function calcOvernightFasting(logs: DailyLog[]): { avg: number; rate16to8: number; count: number } {
+    const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date))
+    let totalH = 0
+    let count = 0
+    let hit16 = 0
+    for (let i = 1; i < sorted.length; i++) {
+      const prevDinner = sorted[i - 1].mealTimes.dinner
+      const todayBreakfast = sorted[i].mealTimes.breakfast
+      if (prevDinner && todayBreakfast) {
+        const h = (new Date(todayBreakfast).getTime() - new Date(prevDinner).getTime()) / (1000 * 60 * 60)
+        if (h > 0 && h < 24) {
+          totalH += h
+          count++
+          if (h >= 16) hit16++
+        }
+      }
+    }
+    return { avg: count > 0 ? totalH / count : 0, rate16to8: count > 0 ? Math.round(hit16 / count * 100) : 0, count }
+  }
+
+  const fasting = calcOvernightFasting(logs)
   const streak = calcStreak(logs)
 
   const DAY_LABELS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
@@ -91,7 +119,7 @@ export default function ProgressPage() {
       {/* streak */}
       <div className="bg-white rounded-2xl shadow-sm p-5 flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-500">连续��录</p>
+          <p className="text-sm text-gray-500">连续记录</p>
           <p className="text-3xl font-bold text-green-500">{streak} <span className="text-base font-normal text-gray-500">天</span></p>
         </div>
         <div className="text-4xl">🔥</div>
@@ -158,6 +186,51 @@ export default function ProgressPage() {
         })}
       </div>
 
+      {/* 饮水达成率 */}
+      <div className="bg-white rounded-2xl shadow-sm p-5">
+        <h2 className="text-sm font-semibold text-gray-700 mb-3">本周饮水达成率（日均）</h2>
+        <div className="flex items-center gap-4">
+          <div className="text-3xl font-bold text-blue-500">{waterPct}%</div>
+          <div className="text-sm text-gray-500">
+            日均 {weekAvgWater}ml / 目标 {settings.dailyWaterTarget}ml
+          </div>
+        </div>
+        <div className="h-2 bg-gray-100 rounded-full overflow-hidden mt-3">
+          <div
+            className="h-full bg-blue-500 rounded-full transition-all duration-500"
+            style={{ width: `${waterPct}%` }}
+          />
+        </div>
+      </div>
+
+      {/* 夜晚空腹统计 */}
+      <div className="bg-white rounded-2xl shadow-sm p-5">
+        <h2 className="text-sm font-semibold text-gray-700 mb-3">夜晚空腹统计（近30天）</h2>
+        {fasting.count > 0 ? (
+          <>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-purple-50 rounded-xl p-3 text-center">
+                <p className="text-2xl font-bold text-purple-600">{fasting.avg.toFixed(1)}h</p>
+                <p className="text-xs text-purple-500">平均空腹时长</p>
+              </div>
+              <div className="bg-indigo-50 rounded-xl p-3 text-center">
+                <p className="text-2xl font-bold text-indigo-600">{fasting.rate16to8}%</p>
+                <p className="text-xs text-indigo-500">16:8 达成率</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mt-3">
+              基于 {fasting.count} 天晚餐→次日早餐的空腹时长统计
+            </p>
+          </>
+        ) : (
+          <div className="text-center py-4 text-gray-400 text-sm">
+            <Moon size={28} className="mx-auto mb-2 opacity-40" />
+            <p>记录进餐时间后自动统计</p>
+            <p className="text-xs mt-1">点击餐段的时钟按钮记录时间</p>
+          </div>
+        )}
+      </div>
+
       {/* 211 达标统计 */}
       <div className="bg-white rounded-2xl shadow-sm p-5">
         <h2 className="text-sm font-semibold text-gray-700 mb-3">今日 211 达标</h2>
@@ -169,7 +242,7 @@ export default function ProgressPage() {
           {MEAL_TYPES.map(m => {
             const entries = todayLog.meals[m]
             const result = entries.length >= 2 ? evaluate211(entries) : null
-            const labelMap: Record<MealType, string> = { breakfast: '早餐', lunch: '午���', dinner: '晚餐', snack: '零食' }
+            const labelMap: Record<MealType, string> = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '零食' }
             const label = labelMap[m]
             return (
               <div

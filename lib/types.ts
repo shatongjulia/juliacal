@@ -18,12 +18,15 @@ export interface UserSettings {
   dailyCarbTarget: number
   dailyProteinTarget: number
   dailyFatTarget: number
+  dailyWaterTarget: number
   onboardingComplete: boolean
 }
 
 export interface DailyLog {
   date: string
   meals: Record<MealType, MealEntry[]>
+  water: number
+  mealTimes: Record<MealType, string | null>
 }
 
 export interface MealEntry {
@@ -37,4 +40,5 @@ export interface MealEntry {
   foodCategory: FoodCategory
   source: 'search' | 'camera'
   createdAt: string
+  per100g?: { calories: number; carbs: number; protein: number; fat: number }
 }

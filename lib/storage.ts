@@ -7,6 +7,10 @@ function emptyMeals(): DailyLog['meals'] {
   return { breakfast: [], lunch: [], dinner: [], snack: [] }
 }
 
+function emptyMealTimes(): DailyLog['mealTimes'] {
+  return { breakfast: null, lunch: null, dinner: null, snack: null }
+}
+
 function migrateIfNeeded() {
   if (typeof window === 'undefined') return
   const stored = localStorage.getItem(VERSION_KEY)
@@ -36,12 +40,18 @@ export function saveSettings(settings: UserSettings): void {
 }
 
 export function getDailyLog(date: string): DailyLog {
-  if (typeof window === 'undefined') return { date, meals: emptyMeals() }
+  if (typeof window === 'undefined') return { date, meals: emptyMeals(), water: 0, mealTimes: emptyMealTimes() }
   try {
     const raw = localStorage.getItem(`juliaCal_log_${date}`)
-    return raw ? JSON.parse(raw) : { date, meals: emptyMeals() }
+    const parsed = raw ? JSON.parse(raw) : null
+    return {
+      date,
+      meals: parsed?.meals ?? emptyMeals(),
+      water: parsed?.water ?? 0,
+      mealTimes: parsed?.mealTimes ?? emptyMealTimes(),
+    }
   } catch {
-    return { date, meals: emptyMeals() }
+    return { date, meals: emptyMeals(), water: 0, mealTimes: emptyMealTimes() }
   }
 }
 

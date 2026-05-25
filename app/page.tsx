@@ -7,6 +7,7 @@ import { UserSettings, DailyLog, MealType } from '@/lib/types'
 import CircularProgress from '@/components/CircularProgress'
 import MacroCard from '@/components/MacroCard'
 import MealSection from '@/components/MealSection'
+import WaterTracker from '@/components/WaterTracker'
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -113,6 +114,14 @@ export default function DashboardPage() {
         <MacroCard label="蛋白质" current={totalProtein} target={settings.dailyProteinTarget} color="#8b5cf6" />
         <MacroCard label="脂肪" current={totalFat} target={settings.dailyFatTarget} color="#f59e0b" />
       </div>
+
+      {/* 饮水 */}
+      <WaterTracker
+        current={log?.water ?? 0}
+        target={settings.dailyWaterTarget}
+        date={selectedDate}
+        onUpdate={loadData}
+      />
 
       {/* 餐食列表 */}
       <div className="space-y-3">

@@ -54,7 +54,56 @@ export async function GET(req: NextRequest) {
     // OFF 失败不影响本地结果
   }
 
-  const products = [...localResults, ...offResults].slice(0, pageSize)
+  let products = [...localResults, ...offResults].slice(0, pageSize)
+
+  // AI 兜底搜索：本地和 OFF 都没结果时，用千文查询
+  if (products.length === 0) {
+    const apiKey = process.env.QWEN_API_KEY
+    if (apiKey) {
+      try {
+        const aiResponse = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'qwen-turbo',
+            max_tokens: 200,
+            messages: [{
+              role: 'user',
+              content: `查询食物"${q}"的每100g营养成分。只返回JSON：{"name":"食物名","calories":每100g的kcal,"carbs":每100g的g,"protein":每100g的g,"fat":每100g的g}。如果不知道就直接返回null。`,
+            }],
+            stream: false,
+          }),
+          signal: AbortSignal.timeout(5000),
+        })
+
+        if (aiResponse.ok) {
+          const aiData = await aiResponse.json()
+          const content = aiData.choices?.[0]?.message?.content || ''
+          try {
+            const jsonMatch = content.match(/\{[\s\S]*\}/)
+            if (jsonMatch) {
+              const result = JSON.parse(jsonMatch[0])
+              if (result && result.name) {
+                products = [{
+                  id: `ai_${q.replace(/[^a-zA-Z0-9一-鿿]/g, '_')}`,
+                  name: result.name,
+                  calories: Number(result.calories) || 0,
+                  carbs: Number(result.carbs) || 0,
+                  protein: Number(result.protein) || 0,
+                  fat: Number(result.fat) || 0,
+                  imageUrl: null,
+                  source: 'ai',
+                }]
+              }
+            }
+          } catch { /* AI 解析失败，返回空 */ }
+        }
+      } catch { /* AI 调用失败，返回空 */ }
+    }
+  }
 
   return NextResponse.json(
     { products, total: products.length, page },

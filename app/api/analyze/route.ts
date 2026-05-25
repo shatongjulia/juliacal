@@ -1,8 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { inferFoodCategory } from '@/lib/diet211'
+import { LOCAL_FOODS, LocalFood } from '@/lib/foodDatabase'
 
 const SUPPORTED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_BASE64_LENGTH = Math.ceil(5 * 1024 * 1024 * (4 / 3)) // 5MB in base64
+
+function matchLocalFood(qwenName: string): LocalFood | null {
+  const q = qwenName.toLowerCase()
+  let best: LocalFood | null = null
+  let bestLen = 0
+  for (const food of LOCAL_FOODS) {
+    const fn = food.name.toLowerCase()
+    if (q.includes(fn) || fn.includes(q)) {
+      if (fn.length > bestLen) {
+        best = food
+        bestLen = fn.length
+      }
+    }
+  }
+  return best
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
@@ -34,20 +51,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'API Key 未配置' }, { status: 500 })
   }
 
-  const prompt = `请分析这张图片中的食物，以JSON格式返回每种食物的营养信息。
-返回格式必须是合法的JSON数组，不要有任何其他文字：
-[
-  {
-    "name": "食物名称",
-    "estimatedWeight": 估计克数（数字）,
-    "calories": 热量（kcal，基于估计克数，数字）,
-    "carbs": 碳水化合物（克，数字）,
-    "protein": 蛋白质（克，数字）,
-    "fat": 脂肪（克��数字）,
-    "category": "protein|vegetable|carb|fat|other"
-  }
-]
-如果图中没有食物，返回空数组 []。`
+  const prompt = `分析图中所有食物（包括混合菜肴、汤羹、主食、配菜）。逐项列出。
+
+**营养数据请按每100g的标准营养表格式提供**（不是整份的值）。
+
+重量估测指南（按优先级）：
+1. 如果图中食物旁边有拳头，以拳头为参照：成年女性拳头≈直径8cm/体积250ml，男性≈10cm/350ml。拳头大小食物≈80-100g，半拳≈40-50g
+2. 参考餐具尺寸：标准餐盘直径约26cm，碗直径约12cm
+3. 常见份量：1碗米饭≈150g，1份炒菜≈150-200g，1碗汤≈300g
+4. 中式食堂常规：荤菜1份≈150g，素菜≈120g，米饭≈150g
+5. 不确定时偏保守，取偏小值
+
+name字段要具体描述菜品（如"红烧肉"、"西红柿炒鸡蛋"、"蒜蓉西兰花"、"白米饭"）。
+即使菜品复杂、混合汤汁，也请尽力估测每项成分的营养。
+
+只返回JSON数组，无其他文字：
+[{"name":"菜品名","estimatedWeight":克数,"calories":每100g的kcal,"carbs":每100g的g,"protein":每100g的g,"fat":每100g的g,"category":"protein|vegetable|carb|fat|other"}]
+图中无食物则返回 []`
 
   try {
     const response = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
@@ -58,6 +78,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model: 'qwen3-vl-plus',
+        max_tokens: 800,
         messages: [
           {
             role: 'user',
@@ -69,11 +90,12 @@ export async function POST(req: NextRequest) {
         ],
         stream: false,
       }),
-      signal: AbortSignal.timeout(28000),
+      signal: AbortSignal.timeout(9000),
     })
 
     if (!response.ok) {
-      console.error('Qwen API error:', response.status, await response.text())
+      const errText = await response.text()
+      console.error('Qwen API error:', response.status, errText)
       return NextResponse.json({ error: 'AI 识别服务暂时不可用' }, { status: 500 })
     }
 
@@ -95,20 +117,54 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '图片中未识别到食物' }, { status: 422 })
     }
 
-    const normalized = foods.map((f: any) => ({
-      name: String(f.name || '未知食物'),
-      estimatedWeight: Number(f.estimatedWeight) || 100,
-      calories: Number(f.calories) || 0,
-      carbs: Number(f.carbs) || 0,
-      protein: Number(f.protein) || 0,
-      fat: Number(f.fat) || 0,
-      category: f.category || inferFoodCategory(
-        Number(f.calories) || 0,
-        Number(f.carbs) || 0,
-        Number(f.protein) || 0,
-        Number(f.fat) || 0,
-      ),
-    }))
+    const normalized = foods.map((f: any) => {
+      const qwenName = String(f.name || '未知食物')
+      const matched = matchLocalFood(qwenName)
+
+      if (matched) {
+        // 匹配到本地数据库：用标准份量 + 数据库营养密度
+        const weight = matched.servingWeight
+        const factor = weight / 100
+        return {
+          name: matched.name,
+          estimatedWeight: weight,
+          calories: Math.round(matched.calories * factor),
+          carbs: Math.round(matched.carbs * factor * 10) / 10,
+          protein: Math.round(matched.protein * factor * 10) / 10,
+          fat: Math.round(matched.fat * factor * 10) / 10,
+          category: matched.category,
+          per100g: {
+            calories: matched.calories,
+            carbs: matched.carbs,
+            protein: matched.protein,
+            fat: matched.fat,
+          },
+        }
+      }
+
+      const weight = Number(f.estimatedWeight) || 100
+      const factor = weight / 100
+      return {
+        name: qwenName,
+        estimatedWeight: weight,
+        calories: Math.round((Number(f.calories) || 0) * factor),
+        carbs: Math.round((Number(f.carbs) || 0) * factor * 10) / 10,
+        protein: Math.round((Number(f.protein) || 0) * factor * 10) / 10,
+        fat: Math.round((Number(f.fat) || 0) * factor * 10) / 10,
+        category: f.category || inferFoodCategory(
+          Number(f.calories) || 0,
+          Number(f.carbs) || 0,
+          Number(f.protein) || 0,
+          Number(f.fat) || 0,
+        ),
+        per100g: {
+          calories: Number(f.calories) || 0,
+          carbs: Number(f.carbs) || 0,
+          protein: Number(f.protein) || 0,
+          fat: Number(f.fat) || 0,
+        },
+      }
+    })
 
     return NextResponse.json({ foods: normalized })
   } catch (error: unknown) {

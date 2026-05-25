@@ -135,6 +135,7 @@ export default function OnboardingPage() {
         dailyCarbTarget: targets.dailyCarbTarget,
         dailyProteinTarget: targets.dailyProteinTarget,
         dailyFatTarget: targets.dailyFatTarget,
+        dailyWaterTarget: targets.dailyWaterTarget,
         onboardingComplete: true,
       }
       saveSettings(settings)
@@ -312,6 +313,7 @@ export default function OnboardingPage() {
                     <span>碳水 {recommendedCalories.dailyCarbTarget}g</span>
                     <span>蛋白质 {recommendedCalories.dailyProteinTarget}g</span>
                     <span>脂肪 {recommendedCalories.dailyFatTarget}g</span>
+                    <span>饮水 {recommendedCalories.dailyWaterTarget}ml</span>
                   </div>
                 </div>
               )}

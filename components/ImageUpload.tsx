@@ -12,6 +12,7 @@ export interface AnalyzedFood {
   protein: number
   fat: number
   category: FoodCategory
+  per100g?: { calories: number; carbs: number; protein: number; fat: number }
 }
 
 interface ImageUploadProps {
@@ -33,25 +34,35 @@ export default function ImageUpload({ onResult, onError, disabled }: ImageUpload
       onError('请上传 JPEG、PNG 或 WebP 格式的图片')
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
-      onError('图片过大，请压缩后重试（≤ 5MB）')
+    if (file.size > 15 * 1024 * 1024) {
+      onError('图片过大（≤ 15MB）')
       return
     }
 
     setLoading(true)
     try {
-      const base64 = await fileToBase64(file)
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64 }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        onError(data.error || '识别失败，请手动搜索食物')
-        return
+      const base64 = await compressImage(file)
+      // 冷启动可能超时，最多尝试 2 次
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const res = await fetch('/api/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: base64 }),
+          })
+          const data = await res.json()
+          if (!res.ok) {
+            onError(data.error || '识别失败，请手动搜索食物')
+            return
+          }
+          onResult(data.foods)
+          return
+        } catch (e) {
+          if (attempt === 2) throw e
+          // 第一次失败，等 2 秒后重试（等冷启动完成）
+          await new Promise(r => setTimeout(r, 2000))
+        }
       }
-      onResult(data.foods)
     } catch {
       onError('识别失败，请手动搜索食物')
     } finally {
@@ -66,7 +77,6 @@ export default function ImageUpload({ onResult, onError, disabled }: ImageUpload
         ref={inputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         className="hidden"
         onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
       />
@@ -74,7 +84,7 @@ export default function ImageUpload({ onResult, onError, disabled }: ImageUpload
         onClick={() => inputRef.current?.click()}
         disabled={disabled || loading}
         className="p-2 text-gray-400 hover:text-green-500 disabled:opacity-40 transition-colors duration-200"
-        title="拍照识别"
+        title="拍照识别（拳头放食物旁可辅助估测份量）"
       >
         {loading ? <Loader2 size={20} className="animate-spin" /> : <Camera size={20} />}
       </button>
@@ -82,11 +92,32 @@ export default function ImageUpload({ onResult, onError, disabled }: ImageUpload
   )
 }
 
-function fileToBase64(file: File): Promise<string> {
+const MAX_DIM = 1000
+const JPEG_QUALITY = 0.75
+
+function compressImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = reject
-    reader.readAsDataURL(file)
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      let { width, height } = img
+      if (width > MAX_DIM || height > MAX_DIM) {
+        const ratio = Math.min(MAX_DIM / width, MAX_DIM / height)
+        width = Math.round(width * ratio)
+        height = Math.round(height * ratio)
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(img, 0, 0, width, height)
+      resolve(canvas.toDataURL('image/jpeg', JPEG_QUALITY))
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('图片加载失败'))
+    }
+    img.src = url
   })
 }

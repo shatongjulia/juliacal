@@ -79,6 +79,7 @@ export default function ProfilePage() {
       dailyCarbTarget: targets.dailyCarbTarget,
       dailyProteinTarget: targets.dailyProteinTarget,
       dailyFatTarget: targets.dailyFatTarget,
+      dailyWaterTarget: targets.dailyWaterTarget,
     }
 
     saveSettings(updated)
@@ -99,7 +100,7 @@ export default function ProfilePage() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900">个人资���</h1>
+        <h1 className="text-xl font-bold text-gray-900">个人资料</h1>
         <button
           onClick={() => editing ? handleSave() : setEditing(true)}
           className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
@@ -225,6 +226,10 @@ export default function ProfilePage() {
             <p className="text-amber-600 font-semibold">{settings.dailyFatTarget}g</p>
             <p className="text-gray-500 text-xs">脂肪</p>
           </div>
+        </div>
+        <div className="mt-2 bg-blue-50 rounded-xl p-2 text-center">
+          <p className="text-blue-600 font-semibold">{settings.dailyWaterTarget}ml</p>
+          <p className="text-gray-500 text-xs">饮水量（体重 × 3.5%）</p>
         </div>
       </div>
 

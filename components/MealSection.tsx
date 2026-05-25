@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Plus, Trash2, Clock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { MealType, MealEntry, FoodCategory } from '@/lib/types'
 import { getDailyLog, saveDailyLog } from '@/lib/storage'
@@ -25,14 +25,54 @@ interface MealSectionProps {
 export default function MealSection({ mealType, entries, date, onUpdate }: MealSectionProps) {
   const router = useRouter()
   const [toast, setToast] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
   const totalCalories = entries.reduce((sum, e) => sum + e.calories, 0)
   const show211 = mealType !== 'snack'
   const assessment = show211 && entries.length >= 2 ? evaluate211(entries) : null
 
+  const log = getDailyLog(date)
+  const mealTime = log.mealTimes[mealType]
+
+  const formatMealTime = (iso: string | null): string | null => {
+    if (!iso) return null
+    try {
+      const d = new Date(iso)
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    } catch { return null }
+  }
+
+  const handleRecordTime = () => {
+    const log = getDailyLog(date)
+    log.mealTimes[mealType] = new Date().toISOString()
+    saveDailyLog(log)
+    onUpdate()
+  }
+
   const showToast = (msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(null), 3000)
+  }
+
+  const handleWeightChange = (id: string, newWeight: number) => {
+    if (newWeight <= 0 || newWeight > 5000) return
+    const log = getDailyLog(date)
+    const entries = log.meals[mealType]
+    const entry = entries.find(e => e.id === id)
+    if (!entry) return
+    const pg = entry.per100g || { calories: entry.calories * 100 / entry.amount, carbs: entry.carbs * 100 / entry.amount, protein: entry.protein * 100 / entry.amount, fat: entry.fat * 100 / entry.amount }
+    entry.amount = newWeight
+    {
+      const factor = newWeight / 100
+      entry.calories = Math.round(pg.calories * factor)
+      entry.carbs = Math.round(pg.carbs * factor * 10) / 10
+      entry.protein = Math.round(pg.protein * factor * 10) / 10
+      entry.fat = Math.round(pg.fat * factor * 10) / 10
+    }
+    entry.per100g = pg
+    saveDailyLog(log)
+    setEditingId(null)
+    onUpdate()
   }
 
   const handleDelete = (id: string) => {
@@ -63,6 +103,7 @@ export default function MealSection({ mealType, entries, date, onUpdate }: MealS
           foodCategory: f.category as FoodCategory,
           source: 'camera' as const,
           createdAt: new Date().toISOString(),
+          per100g: f.per100g,
         }
       })
       log.meals[mealType] = [...log.meals[mealType], ...newEntries]
@@ -80,6 +121,9 @@ export default function MealSection({ mealType, entries, date, onUpdate }: MealS
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-gray-900">{MEAL_LABELS[mealType]}</span>
+          {formatMealTime(mealTime) && (
+            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{formatMealTime(mealTime)}</span>
+          )}
           {totalCalories > 0 && (
             <span className="text-sm text-gray-500">{Math.round(totalCalories)} kcal</span>
           )}
@@ -94,6 +138,13 @@ export default function MealSection({ mealType, entries, date, onUpdate }: MealS
           )}
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={handleRecordTime}
+            className="p-2 text-gray-400 hover:text-blue-500 transition-colors duration-200"
+            title="记录进餐时间"
+          >
+            <Clock size={18} />
+          </button>
           <ImageUpload
             onResult={handleCameraResult}
             onError={showToast}
@@ -116,7 +167,22 @@ export default function MealSection({ mealType, entries, date, onUpdate }: MealS
             <li key={entry.id} className="flex items-center justify-between px-4 py-3">
               <div>
                 <p className="text-sm font-medium text-gray-800">{entry.name}</p>
-                <p className="text-xs text-gray-400">{Math.round(entry.amount)}g · {Math.round(entry.calories)} kcal</p>
+                <p className="text-xs text-gray-400">
+                  {editingId === entry.id ? (
+                    <EditableWeight
+                      value={entry.amount}
+                      onConfirm={w => handleWeightChange(entry.id, w)}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setEditingId(entry.id)}
+                      className="text-gray-400 border-b border-dashed border-gray-300 hover:text-gray-600 hover:border-gray-400 transition-colors"
+                    >
+                      {Math.round(entry.amount)}g
+                    </button>
+                  )}
+                  <span> · {Math.round(entry.calories)} kcal</span>
+                </p>
               </div>
               <button
                 onClick={() => handleDelete(entry.id)}
@@ -147,5 +213,34 @@ export default function MealSection({ mealType, entries, date, onUpdate }: MealS
         </div>
       )}
     </div>
+  )
+}
+
+function EditableWeight({ value, onConfirm }: { value: number; onConfirm: (w: number) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [])
+
+  const commit = () => {
+    const v = Number(inputRef.current?.value)
+    if (v > 0 && v <= 5000) onConfirm(v)
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      type="number"
+      inputMode="numeric"
+      defaultValue={Math.round(value)}
+      className="w-14 px-1 py-0 text-xs border border-gray-300 rounded focus:outline-none focus:border-green-400"
+      onBlur={commit}
+      onKeyDown={e => {
+        if (e.key === 'Enter') commit()
+        if (e.key === 'Escape') onConfirm(value)
+      }}
+    />
   )
 }

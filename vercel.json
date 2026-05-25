@@ -1,0 +1,11 @@
+{
+  "functions": {
+    "app/api/analyze/route": {
+      "regions": ["hkg1"],
+      "maxDuration": 10
+    },
+    "app/api/food/route": {
+      "regions": ["hkg1"]
+    }
+  }
+}

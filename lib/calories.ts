@@ -22,11 +22,16 @@ export function calculateDailyTarget(tdee: number, goal: Goal): number {
   return Math.round(tdee)
 }
 
+// 211 饮食法：蛋白:碳水 = 2.8:1，脂肪占 20%
 export function calculateMacros(dailyCalories: number) {
+  const fatRatio = 0.20
+  const remaining = 1 - fatRatio
+  const proteinRatio = remaining * (2.8 / 3.8)
+  const carbRatio = remaining * (1 / 3.8)
   return {
-    dailyCarbTarget: Math.round((dailyCalories * 0.5) / 4),
-    dailyProteinTarget: Math.round((dailyCalories * 0.25) / 4),
-    dailyFatTarget: Math.round((dailyCalories * 0.25) / 9),
+    dailyCarbTarget: Math.round((dailyCalories * carbRatio) / 4),
+    dailyProteinTarget: Math.round((dailyCalories * proteinRatio) / 4),
+    dailyFatTarget: Math.round((dailyCalories * fatRatio) / 9),
   }
 }
 
@@ -35,5 +40,6 @@ export function buildUserTargets(settings: Pick<UserSettings, 'gender' | 'weight
   const tdee = calculateTDEE(bmr, settings.activityLevel)
   const dailyCalorieTarget = calculateDailyTarget(tdee, settings.goal)
   const macros = calculateMacros(dailyCalorieTarget)
-  return { dailyCalorieTarget, ...macros }
+  const dailyWaterTarget = Math.round(settings.weight * 35)
+  return { dailyCalorieTarget, ...macros, dailyWaterTarget }
 }

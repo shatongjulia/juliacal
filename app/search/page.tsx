@@ -116,6 +116,12 @@ function SearchPageContent() {
       foodCategory: category,
       source: 'search',
       createdAt: new Date().toISOString(),
+      per100g: {
+        calories: selected.calories,
+        carbs: selected.carbs,
+        protein: selected.protein,
+        fat: selected.fat,
+      },
     }
     const log = getDailyLog(date)
     log.meals[selectedMeal] = [...log.meals[selectedMeal], entry]
@@ -285,7 +291,7 @@ function SearchPageContent() {
           {!query && (
             <div className="text-center py-12 text-gray-400">
               <Search size={40} className="mx-auto mb-3 opacity-40" />
-              <p>输入食物名���开始搜索</p>
+              <p>输入食物名称开始搜索</p>
             </div>
           )}
         </>

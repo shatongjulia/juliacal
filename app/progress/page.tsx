@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { getSettings, getRecentLogs } from '@/lib/storage'
-import { UserSettings, DailyLog, MealType } from '@/lib/types'
+import { DailyLog, MealType } from '@/lib/types'
+import { getMacroTargets } from '@/lib/calories'
 import { evaluate211 } from '@/lib/diet211'
 import { Moon } from 'lucide-react'
 
-const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner']
+const MEAL_TYPES: MealType[] = ['lunch', 'dinner']
 
 function getWeekDays(): string[] {
   const days: string[] = []
@@ -33,17 +33,14 @@ function calcStreak(logs: DailyLog[]): number {
 }
 
 export default function ProgressPage() {
-  const [settings, setSettings] = useState<UserSettings | null>(null)
-  const [logs, setLogs] = useState<DailyLog[]>([])
-
-  useEffect(() => {
-    setSettings(getSettings())
-    setLogs(getRecentLogs(30))
-  }, [])
+  const settings = getSettings()
+  const logs = getRecentLogs(30)
 
   if (!settings) {
     return <div className="flex items-center justify-center min-h-screen text-gray-400">加载中...</div>
   }
+
+  const macroTargets = getMacroTargets(settings)
 
   const weekDays = getWeekDays()
   const emptyLog = (date: string): DailyLog => ({ date, meals: { breakfast: [], lunch: [], dinner: [], snack: [] }, water: 0, mealTimes: { breakfast: null, lunch: null, dinner: null, snack: null } })
@@ -60,15 +57,19 @@ export default function ProgressPage() {
   const weekAvg = weekLogs.reduce(
     (acc, log) => {
       const entries = Object.values(log.meals).flat()
+      const veg = entries.filter(e => e.foodCategory === 'vegetable')
       acc.carbs += entries.reduce((s, e) => s + e.carbs, 0)
+      acc.vegCarbs += veg.reduce((s, e) => s + e.carbs, 0)
       acc.protein += entries.reduce((s, e) => s + e.protein, 0)
       acc.fat += entries.reduce((s, e) => s + e.fat, 0)
       return acc
     },
-    { carbs: 0, protein: 0, fat: 0 }
+    { carbs: 0, vegCarbs: 0, protein: 0, fat: 0 }
   )
   const daysWithData = weekLogs.filter(l => Object.values(l.meals).flat().length > 0).length || 1
   const avgCarbs = weekAvg.carbs / daysWithData
+  const avgVegCarbs = weekAvg.vegCarbs / daysWithData
+  const avgNetCarbs = avgCarbs - avgVegCarbs * 0.5
   const avgProtein = weekAvg.protein / daysWithData
   const avgFat = weekAvg.fat / daysWithData
 
@@ -78,7 +79,7 @@ export default function ProgressPage() {
   const today211 = MEAL_TYPES.filter(m => {
     const entries = todayLog.meals[m]
     if (entries.length < 2) return false
-    const result = evaluate211(entries)
+    const result = evaluate211(entries, m, settings.dietMode)
     return result?.compliant ?? false
   }).length
 
@@ -87,7 +88,7 @@ export default function ProgressPage() {
   const waterPct = Math.round(Math.min(weekAvgWater / settings.dailyWaterTarget, 1) * 100)
 
   // 夜晚空腹时间（早餐 - 前一天晚餐）
-  function calcOvernightFasting(logs: DailyLog[]): { avg: number; rate16to8: number; count: number } {
+  function calcOvernightFasting(logs: DailyLog[]): { avg: number; rate16to8: number; count: number; hit16: number } {
     const sorted = [...logs].sort((a, b) => a.date.localeCompare(b.date))
     let totalH = 0
     let count = 0
@@ -104,7 +105,7 @@ export default function ProgressPage() {
         }
       }
     }
-    return { avg: count > 0 ? totalH / count : 0, rate16to8: count > 0 ? Math.round(hit16 / count * 100) : 0, count }
+    return { avg: count > 0 ? totalH / count : 0, rate16to8: count > 0 ? Math.round(hit16 / count * 100) : 0, count, hit16 }
   }
 
   const fasting = calcOvernightFasting(logs)
@@ -163,9 +164,9 @@ export default function ProgressPage() {
       <div className="bg-white rounded-2xl shadow-sm p-5">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">本周宏量达成率（日均）</h2>
         {[
-          { label: '碳水', avg: avgCarbs, target: settings.dailyCarbTarget, color: '#3b82f6' },
-          { label: '蛋白质', avg: avgProtein, target: settings.dailyProteinTarget, color: '#8b5cf6' },
-          { label: '脂肪', avg: avgFat, target: settings.dailyFatTarget, color: '#f59e0b' },
+          { label: '碳水', avg: avgNetCarbs, target: macroTargets.dailyCarbTarget, color: '#3b82f6', note: `含蔬菜 ${Math.round(avgVegCarbs)}g` },
+          { label: '蛋白质', avg: avgProtein, target: macroTargets.dailyProteinTarget, color: '#8b5cf6' },
+          { label: '脂肪', avg: avgFat, target: macroTargets.dailyFatTarget, color: '#f59e0b' },
         ].map(m => {
           const ratio = Math.min(m.avg / m.target, 1)
           const pct = Math.round(m.avg / m.target * 100)
@@ -175,6 +176,9 @@ export default function ProgressPage() {
                 <span className="text-gray-600">{m.label}</span>
                 <span className="text-gray-500">{Math.round(m.avg)}g / {m.target}g ({pct}%)</span>
               </div>
+              {'note' in m && (
+                <p className="text-[10px] text-gray-400 mb-1">{m.note}</p>
+              )}
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
@@ -214,8 +218,8 @@ export default function ProgressPage() {
                 <p className="text-xs text-purple-500">平均空腹时长</p>
               </div>
               <div className="bg-indigo-50 rounded-xl p-3 text-center">
-                <p className="text-2xl font-bold text-indigo-600">{fasting.rate16to8}%</p>
-                <p className="text-xs text-indigo-500">16:8 达成率</p>
+                <p className="text-2xl font-bold text-indigo-600">{fasting.hit16}<span className="text-base font-normal text-indigo-400">/30天</span></p>
+                <p className="text-xs text-indigo-500">16:8 达成次数</p>
               </div>
             </div>
             <p className="text-xs text-gray-400 mt-3">
@@ -235,13 +239,13 @@ export default function ProgressPage() {
       <div className="bg-white rounded-2xl shadow-sm p-5">
         <h2 className="text-sm font-semibold text-gray-700 mb-3">今日 211 达标</h2>
         <div className="flex items-center gap-3">
-          <div className="text-3xl font-bold text-green-500">{today211}/3</div>
-          <div className="text-sm text-gray-500">餐达标（早/午/晚）</div>
+          <div className="text-3xl font-bold text-green-500">{today211}/2</div>
+          <div className="text-sm text-gray-500">餐达标（午/晚）</div>
         </div>
         <div className="flex gap-2 mt-3">
           {MEAL_TYPES.map(m => {
             const entries = todayLog.meals[m]
-            const result = entries.length >= 2 ? evaluate211(entries) : null
+            const result = entries.length >= 2 ? evaluate211(entries, m, settings.dietMode) : null
             const labelMap: Record<MealType, string> = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '零食' }
             const label = labelMap[m]
             return (

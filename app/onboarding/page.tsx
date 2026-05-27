@@ -28,6 +28,7 @@ interface FormData {
   weight: string
   activityLevel: ActivityLevel | ''
   goal: Goal | ''
+  dietMode: 'peace' | 'campaign'
 }
 
 interface FormErrors {
@@ -51,6 +52,7 @@ export default function OnboardingPage() {
     weight: '',
     activityLevel: '',
     goal: '',
+    dietMode: 'peace',
   })
   const [errors, setErrors] = useState<FormErrors>({})
 
@@ -68,6 +70,7 @@ export default function OnboardingPage() {
         weight,
         activityLevel: form.activityLevel as ActivityLevel,
         goal: form.goal as Goal,
+        dietMode: form.dietMode,
       })
       return targets
     } catch {
@@ -103,7 +106,7 @@ export default function OnboardingPage() {
 
   const handleNext = () => {
     if (!validateStep()) return
-    if (step < 5) {
+    if (step < 6) {
       setStep(s => s + 1)
       setErrors({})
     } else {
@@ -121,6 +124,7 @@ export default function OnboardingPage() {
         weight: Number(form.weight),
         activityLevel: form.activityLevel as ActivityLevel,
         goal: form.goal as Goal,
+        dietMode: form.dietMode,
       })
       const settings: UserSettings = {
         version: 1,
@@ -131,6 +135,7 @@ export default function OnboardingPage() {
         weight: Number(form.weight),
         activityLevel: form.activityLevel as ActivityLevel,
         goal: form.goal as Goal,
+        dietMode: form.dietMode,
         dailyCalorieTarget: targets.dailyCalorieTarget,
         dailyCarbTarget: targets.dailyCarbTarget,
         dailyProteinTarget: targets.dailyProteinTarget,
@@ -156,7 +161,7 @@ export default function OnboardingPage() {
 
         {/* Progress dots */}
         <div className="flex justify-center gap-2 mb-8">
-          {[1, 2, 3, 4, 5].map(i => (
+          {[1, 2, 3, 4, 5, 6].map(i => (
             <div
               key={i}
               className={`h-2 rounded-full transition-all duration-300 ${
@@ -319,6 +324,33 @@ export default function OnboardingPage() {
               )}
             </div>
           )}
+
+          {/* Step 6: 饮食模式 */}
+          {step === 6 && (
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-1">选择饮食模式</h2>
+              <p className="text-gray-500 mb-6">可以随时在资料页切换</p>
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  { value: 'peace' as const, label: '🍃 和平模式', desc: '30/30/40，长期维持' },
+                  { value: 'campaign' as const, label: '🔥 战役模式', desc: '绝对克数锚定，减脂冲刺' },
+                ]).map(m => (
+                  <button
+                    key={m.value}
+                    onClick={() => setForm(f => ({ ...f, dietMode: m.value }))}
+                    className={`py-4 px-2 rounded-xl border-2 text-center transition-all duration-200 ${
+                      form.dietMode === m.value
+                        ? 'border-green-500 bg-green-50 text-green-700'
+                        : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="text-sm font-medium">{m.label}</div>
+                    <div className="text-[10px] opacity-60 mt-1">{m.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Navigation buttons */}
@@ -335,7 +367,7 @@ export default function OnboardingPage() {
             onClick={handleNext}
             className="flex-1 flex items-center justify-center gap-1 px-5 py-3 rounded-xl bg-green-500 text-white font-medium hover:bg-green-600 active:scale-98 transition-all duration-200"
           >
-            {step === 5 ? '开始使用' : <><span>下一步</span><ChevronRight size={18} /></>}
+            {step === 6 ? '开始使用' : <><span>下一步</span><ChevronRight size={18} /></>}
           </button>
         </div>
       </div>

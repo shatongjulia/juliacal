@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cp -r /d/Juliacode/calorie_tmp/app /d/Juliacode/calorie/)",
+      "Bash(cp -r /d/Juliacode/calorie_tmp/public /d/Juliacode/calorie/)",
+      "Bash(cp /d/Juliacode/calorie_tmp/package.json /d/Juliacode/calorie/)",
+      "Bash(cp /d/Juliacode/calorie_tmp/package-lock.json /d/Juliacode/calorie/)",
+      "Bash(cp /d/Juliacode/calorie_tmp/next.config.ts /d/Juliacode/calorie/)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git:*)",
+      "Bash(npm run:*)",
+      "Bash(agent-browser fill *)",
+      "Bash(agent-browser click *)",
+      "Bash(agent-browser wait *)",
+      "Bash(agent-browser snapshot *)",
+      "Bash(vercel deploy *)"
+    ]
+  }
+}

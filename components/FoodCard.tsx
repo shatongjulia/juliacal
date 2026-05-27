@@ -5,10 +5,11 @@ interface FoodCardProps {
   protein?: number
   fat?: number
   imageUrl?: string | null
+  source?: string
   onClick?: () => void
 }
 
-export default function FoodCard({ name, calories, carbs, protein, fat, imageUrl, onClick }: FoodCardProps) {
+export default function FoodCard({ name, calories, carbs, protein, fat, imageUrl, source, onClick }: FoodCardProps) {
   return (
     <button
       onClick={onClick}
@@ -23,7 +24,12 @@ export default function FoodCard({ name, calories, carbs, protein, fat, imageUrl
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-gray-900 truncate">{name}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="font-medium text-gray-900 truncate">{name}</p>
+            {source === 'ai' && (
+              <span className="text-[10px] bg-purple-50 text-purple-500 px-1 py-0.5 rounded flex-shrink-0">AI估算</span>
+            )}
+          </div>
           <p className="text-sm text-gray-500">{Math.round(calories)} kcal/100g</p>
         </div>
         {(carbs !== undefined || protein !== undefined || fat !== undefined) && (

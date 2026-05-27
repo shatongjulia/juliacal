@@ -16,6 +16,7 @@ interface FoodProduct {
   protein: number
   fat: number
   imageUrl?: string | null
+  source?: string
 }
 
 const MEAL_LABELS: Record<MealType, string> = {
@@ -283,6 +284,7 @@ function SearchPageContent() {
                   protein={p.protein}
                   fat={p.fat}
                   imageUrl={p.imageUrl}
+                  source={p.source}
                   onClick={() => handleSelectFood(p)}
                 />
               ))}

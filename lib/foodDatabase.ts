@@ -24,7 +24,7 @@ export const LOCAL_FOODS: LocalFood[] = [
   { id: 'l_pork_lean', name: '猪瘦肉', calories: 143, carbs: 1.5, protein: 20.3, fat: 6.2, category: 'protein', servingWeight: 100 },
   { id: 'l_pork_fat', name: '猪五花肉', calories: 395, carbs: 2.4, protein: 14.6, fat: 37.0, category: 'fat', servingWeight: 100 },
   { id: 'l_beef', name: '牛肉（瘦）', calories: 106, carbs: 2.0, protein: 20.2, fat: 2.3, category: 'protein', servingWeight: 100 },
-  { id: 'l_beef_fat', name: '牛肉（肥瘦）', calories: 250, carbs: 2.0, protein: 17.8, fat: 19.2, category: 'protein', servingWeight: 100 },
+  { id: 'l_beef_fat', name: '牛肉（肥瘦）', calories: 250, carbs: 2.0, protein: 17.8, fat: 19.2, category: 'fat', servingWeight: 100 },
   { id: 'l_lamb', name: '羊肉', calories: 203, carbs: 0, protein: 19.0, fat: 14.1, category: 'protein', servingWeight: 100 },
   { id: 'l_pork_rib', name: '猪排骨', calories: 278, carbs: 0, protein: 18.3, fat: 22.0, category: 'protein', servingWeight: 200 },
   { id: 'l_bacon', name: '培根', calories: 541, carbs: 1.4, protein: 12.5, fat: 53.0, category: 'fat', servingWeight: 30 },

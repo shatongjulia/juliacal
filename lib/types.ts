@@ -4,6 +4,7 @@ export type FoodCategory = 'protein' | 'vegetable' | 'carb' | 'fat' | 'other'
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active'
 export type Goal = 'lose' | 'maintain' | 'gain'
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
+export type DietMode = 'peace' | 'campaign'
 
 export interface UserSettings {
   version: number
@@ -14,6 +15,7 @@ export interface UserSettings {
   weight: number
   activityLevel: ActivityLevel
   goal: Goal
+  dietMode: DietMode
   dailyCalorieTarget: number
   dailyCarbTarget: number
   dailyProteinTarget: number

@@ -1,4 +1,4 @@
-import { ActivityLevel, Goal, UserSettings } from './types'
+import { ActivityLevel, Goal, UserSettings, DietMode } from './types'
 
 const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
   sedentary: 1.2,
@@ -22,20 +22,45 @@ export function calculateDailyTarget(tdee: number, goal: Goal): number {
   return Math.round(tdee)
 }
 
-// 211 饮食法：蛋白:碳水 = 2.8:1，脂肪占 20%
+// 和平模式：蛋白 30%、脂肪 30%、碳水 40%
 export function calculateMacros(dailyCalories: number) {
-  const fatRatio = 0.20
-  const remaining = 1 - fatRatio
-  const proteinRatio = remaining * (2.8 / 3.8)
-  const carbRatio = remaining * (1 / 3.8)
   return {
-    dailyCarbTarget: Math.round((dailyCalories * carbRatio) / 4),
-    dailyProteinTarget: Math.round((dailyCalories * proteinRatio) / 4),
-    dailyFatTarget: Math.round((dailyCalories * fatRatio) / 9),
+    dailyCarbTarget: Math.round((dailyCalories * 0.40) / 4),
+    dailyProteinTarget: Math.round((dailyCalories * 0.30) / 4),
+    dailyFatTarget: Math.round((dailyCalories * 0.30) / 9),
   }
 }
 
-export function buildUserTargets(settings: Pick<UserSettings, 'gender' | 'weight' | 'height' | 'age' | 'activityLevel' | 'goal'>) {
+// 战役模式：绝对克数锚定法（蛋白 2.2 / 碳水 1.4 / 脂肪 0.9 g/kg）
+export function calculateCampaignMacros(weight: number) {
+  const p = Math.round(weight * 2.2)
+  const c = Math.round(weight * 1.4)
+  const f = Math.round(weight * 0.9)
+  return {
+    dailyCalorieTarget: p * 4 + c * 4 + f * 9,
+    dailyCarbTarget: c,
+    dailyProteinTarget: p,
+    dailyFatTarget: f,
+    dailyWaterTarget: Math.round(weight * 35),
+  }
+}
+
+// 根据 dietMode 返回当前模式的目标值（用于显示页）
+export function getMacroTargets(settings: UserSettings) {
+  if (settings.dietMode === 'campaign') {
+    return calculateCampaignMacros(settings.weight)
+  }
+  return {
+    dailyCalorieTarget: settings.dailyCalorieTarget,
+    dailyWaterTarget: settings.dailyWaterTarget,
+    ...calculateMacros(settings.dailyCalorieTarget),
+  }
+}
+
+export function buildUserTargets(settings: Pick<UserSettings, 'gender' | 'weight' | 'height' | 'age' | 'activityLevel' | 'goal' | 'dietMode'>) {
+  if (settings.dietMode === 'campaign') {
+    return calculateCampaignMacros(settings.weight)
+  }
   const bmr = calculateBMR(settings.gender, settings.weight, settings.height, settings.age)
   const tdee = calculateTDEE(bmr, settings.activityLevel)
   const dailyCalorieTarget = calculateDailyTarget(tdee, settings.goal)

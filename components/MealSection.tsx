@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Plus, Trash2, Clock } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { MealType, MealEntry, FoodCategory } from '@/lib/types'
+import { MealType, MealEntry, FoodCategory, DietMode } from '@/lib/types'
 import { getDailyLog, saveDailyLog } from '@/lib/storage'
 import { evaluate211 } from '@/lib/diet211'
 import ImageUpload, { AnalyzedFood } from './ImageUpload'
@@ -20,16 +20,19 @@ interface MealSectionProps {
   entries: MealEntry[]
   date: string
   onUpdate: () => void
+  dietMode?: DietMode
 }
 
-export default function MealSection({ mealType, entries, date, onUpdate }: MealSectionProps) {
+export default function MealSection({ mealType, entries, date, onUpdate, dietMode }: MealSectionProps) {
   const router = useRouter()
   const [toast, setToast] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingTime, setEditingTime] = useState(false)
+  const timeInputRef = useRef<HTMLInputElement>(null)
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
   const totalCalories = entries.reduce((sum, e) => sum + e.calories, 0)
-  const show211 = mealType !== 'snack'
-  const assessment = show211 && entries.length >= 2 ? evaluate211(entries) : null
+  const show211 = mealType !== 'snack' && mealType !== 'breakfast'
+  const assessment = show211 && entries.length >= 2 ? evaluate211(entries, mealType, dietMode) : null
 
   const log = getDailyLog(date)
   const mealTime = log.mealTimes[mealType]
@@ -48,6 +51,24 @@ export default function MealSection({ mealType, entries, date, onUpdate }: MealS
     saveDailyLog(log)
     onUpdate()
   }
+
+  const commitTimeEdit = (value: string) => {
+    const [h, m] = value.split(':').map(Number)
+    const log = getDailyLog(date)
+    const d = new Date(log.date + 'T00:00:00')
+    d.setHours(h, m, 0, 0)
+    log.mealTimes[mealType] = d.toISOString()
+    saveDailyLog(log)
+    setEditingTime(false)
+    onUpdate()
+  }
+
+  useEffect(() => {
+    if (editingTime) {
+      timeInputRef.current?.focus()
+      timeInputRef.current?.select()
+    }
+  }, [editingTime])
 
   const showToast = (msg: string) => {
     setToast(msg)
@@ -121,9 +142,27 @@ export default function MealSection({ mealType, entries, date, onUpdate }: MealS
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-gray-900">{MEAL_LABELS[mealType]}</span>
-          {formatMealTime(mealTime) && (
-            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{formatMealTime(mealTime)}</span>
-          )}
+          {editingTime ? (
+            <input
+              ref={timeInputRef}
+              type="time"
+              defaultValue={formatMealTime(mealTime) ?? undefined}
+              className="text-xs w-16 px-1 py-0 border border-gray-300 rounded focus:outline-none focus:border-green-400"
+              onBlur={e => commitTimeEdit(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') commitTimeEdit(e.currentTarget.value)
+                if (e.key === 'Escape') setEditingTime(false)
+              }}
+            />
+          ) : formatMealTime(mealTime) ? (
+            <button
+              onClick={() => setEditingTime(true)}
+              className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded hover:text-gray-600 hover:bg-gray-200 transition-colors"
+              title="点击修改进餐时间"
+            >
+              {formatMealTime(mealTime)}
+            </button>
+          ) : null}
           {totalCalories > 0 && (
             <span className="text-sm text-gray-500">{Math.round(totalCalories)} kcal</span>
           )}
@@ -166,7 +205,12 @@ export default function MealSection({ mealType, entries, date, onUpdate }: MealS
           {entries.map(entry => (
             <li key={entry.id} className="flex items-center justify-between px-4 py-3">
               <div>
-                <p className="text-sm font-medium text-gray-800">{entry.name}</p>
+                <p className="text-sm font-medium text-gray-800">
+                  {entry.name}
+                  {entry.foodCategory === 'protein' && entry.fat * 100 / entry.protein >= 50 && (
+                    <span className="ml-1.5 text-[10px] text-amber-500 bg-amber-50 px-1 py-0.5 rounded" title="此蛋白食物脂肪含量较高（脂肪/蛋白质 ≥ 50%）">高脂</span>
+                  )}
+                </p>
                 <p className="text-xs text-gray-400">
                   {editingId === entry.id ? (
                     <EditableWeight

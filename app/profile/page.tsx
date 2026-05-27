@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { UserSettings, ActivityLevel, Goal } from '@/lib/types'
+import { UserSettings, ActivityLevel, Goal, DietMode } from '@/lib/types'
 import { getSettings, saveSettings, clearAllData } from '@/lib/storage'
-import { buildUserTargets } from '@/lib/calories'
+import { buildUserTargets, getMacroTargets } from '@/lib/calories'
 
 const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
   sedentary: '久坐（几乎不运动）',
@@ -27,6 +27,7 @@ export default function ProfilePage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [showConfirm, setShowConfirm] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [calorieManuallySet, setCalorieManuallySet] = useState(false)
 
   useEffect(() => {
     const s = getSettings()
@@ -57,6 +58,7 @@ export default function ProfilePage() {
     setErrors(newErrors)
     if (Object.keys(newErrors).length > 0) return
 
+    const dietMode = (form.dietMode || 'peace') as DietMode
     const targets = buildUserTargets({
       gender: form.gender as 'male' | 'female',
       age,
@@ -64,6 +66,7 @@ export default function ProfilePage() {
       weight,
       activityLevel: form.activityLevel as ActivityLevel,
       goal: form.goal as Goal,
+      dietMode,
     })
 
     const updated: UserSettings = {
@@ -75,7 +78,8 @@ export default function ProfilePage() {
       gender: form.gender as 'male' | 'female',
       activityLevel: form.activityLevel as ActivityLevel,
       goal: form.goal as Goal,
-      dailyCalorieTarget: target >= 1000 ? target : targets.dailyCalorieTarget,
+      dietMode,
+      dailyCalorieTarget: calorieManuallySet ? target : targets.dailyCalorieTarget,
       dailyCarbTarget: targets.dailyCarbTarget,
       dailyProteinTarget: targets.dailyProteinTarget,
       dailyFatTarget: targets.dailyFatTarget,
@@ -97,12 +101,14 @@ export default function ProfilePage() {
     return <div className="flex items-center justify-center min-h-screen text-gray-400">加载中...</div>
   }
 
+  const macroTargets = getMacroTargets(settings)
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-900">个人资料</h1>
         <button
-          onClick={() => editing ? handleSave() : setEditing(true)}
+          onClick={() => editing ? handleSave() : (setEditing(true), setCalorieManuallySet(false))}
           className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
             editing
               ? 'bg-green-500 text-white hover:bg-green-600'
@@ -167,34 +173,96 @@ export default function ProfilePage() {
 
         <Field label="活动水平" error={errors.activityLevel}>
           {editing ? (
-            <select
-              value={form.activityLevel || ''}
-              onChange={e => setForm(f => ({ ...f, activityLevel: e.target.value as ActivityLevel }))}
-              className="input-field bg-white"
-            >
-              {(Object.keys(ACTIVITY_LABELS) as ActivityLevel[]).map(k => (
-                <option key={k} value={k}>{ACTIVITY_LABELS[k]}</option>
-              ))}
-            </select>
+            (form.dietMode || 'peace') === 'campaign' ? (
+              <div>
+                <select
+                  value={form.activityLevel || ''}
+                  onChange={e => setForm(f => ({ ...f, activityLevel: e.target.value as ActivityLevel }))}
+                  className="input-field bg-gray-50 text-gray-400 cursor-not-allowed"
+                  disabled
+                >
+                  {(Object.keys(ACTIVITY_LABELS) as ActivityLevel[]).map(k => (
+                    <option key={k} value={k}>{ACTIVITY_LABELS[k]}</option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-gray-400 mt-1">战役模式由体重直接锚定，切换回和平模式时保留此设置</p>
+              </div>
+            ) : (
+              <select
+                value={form.activityLevel || ''}
+                onChange={e => setForm(f => ({ ...f, activityLevel: e.target.value as ActivityLevel }))}
+                className="input-field bg-white"
+              >
+                {(Object.keys(ACTIVITY_LABELS) as ActivityLevel[]).map(k => (
+                  <option key={k} value={k}>{ACTIVITY_LABELS[k]}</option>
+                ))}
+              </select>
+            )
           ) : <span>{ACTIVITY_LABELS[settings.activityLevel]}</span>}
         </Field>
 
         <Field label="目标" error={errors.goal}>
           {editing ? (
+            (form.dietMode || 'peace') === 'campaign' ? (
+              <div>
+                <div className="flex gap-2 opacity-50 pointer-events-none">
+                  {(Object.keys(GOAL_LABELS) as Goal[]).map(g => (
+                    <button
+                      key={g}
+                      className={`flex-1 py-2 rounded-xl border-2 text-xs ${
+                        form.goal === g ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-600'
+                      }`}
+                    >
+                      {GOAL_LABELS[g]}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">战役模式为减脂冲刺，由体重直接锚定宏量</p>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                {(Object.keys(GOAL_LABELS) as Goal[]).map(g => (
+                  <button
+                    key={g}
+                    onClick={() => setForm(f => ({ ...f, goal: g }))}
+                    className={`flex-1 py-2 rounded-xl border-2 text-xs transition-all duration-200 ${
+                      form.goal === g ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-600'
+                    }`}
+                  >
+                    {GOAL_LABELS[g]}
+                  </button>
+                ))}
+              </div>
+            )
+          ) : <span>{GOAL_LABELS[settings.goal]}</span>}
+        </Field>
+      </div>
+
+      {/* 饮食模式 */}
+      <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
+        <h2 className="text-sm font-semibold text-gray-700">饮食模式</h2>
+        <Field label="模式">
+          {editing ? (
             <div className="flex gap-2">
-              {(Object.keys(GOAL_LABELS) as Goal[]).map(g => (
+              {([
+                { value: 'peace', label: '🍃 和平模式', desc: '30/30/40，长期维持' },
+                { value: 'campaign', label: '🔥 战役模式', desc: '绝对克数锚定，减脂冲刺' },
+              ] as const).map(m => (
                 <button
-                  key={g}
-                  onClick={() => setForm(f => ({ ...f, goal: g }))}
+                  key={m.value}
+                  onClick={() => setForm(f => ({ ...f, dietMode: m.value }))}
                   className={`flex-1 py-2 rounded-xl border-2 text-xs transition-all duration-200 ${
-                    form.goal === g ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-600'
+                    (form.dietMode || 'peace') === m.value ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-600'
                   }`}
                 >
-                  {GOAL_LABELS[g]}
+                  <div>{m.label}</div>
+                  <div className="text-[10px] opacity-60">{m.desc}</div>
                 </button>
               ))}
             </div>
-          ) : <span>{GOAL_LABELS[settings.goal]}</span>}
+          ) : (
+            <span>{settings.dietMode === 'campaign' ? '🔥 战役模式' : '🍃 和平模式'}</span>
+          )}
         </Field>
       </div>
 
@@ -203,27 +271,31 @@ export default function ProfilePage() {
         <h2 className="text-sm font-semibold text-gray-700">每日热量目标</h2>
         <Field label="热量（kcal）" error={errors.dailyCalorieTarget}>
           {editing ? (
-            <input
-              type="number"
-              value={String(form.dailyCalorieTarget || '')}
-              min="1000"
-              step="10"
-              onChange={e => setForm(f => ({ ...f, dailyCalorieTarget: Number(e.target.value) }))}
-              className="input-field"
-            />
+            (form.dietMode || 'peace') === 'campaign' ? (
+              <span className="text-gray-400 text-sm">由体重自动计算 ({macroTargets.dailyCalorieTarget} kcal)</span>
+            ) : (
+              <input
+                type="number"
+                value={String(form.dailyCalorieTarget || '')}
+                min="1000"
+                step="10"
+                onChange={e => { setCalorieManuallySet(true); setForm(f => ({ ...f, dailyCalorieTarget: Number(e.target.value) })) }}
+                className="input-field"
+              />
+            )
           ) : <span className="text-green-600 font-semibold">{settings.dailyCalorieTarget} kcal</span>}
         </Field>
         <div className="grid grid-cols-3 gap-2 text-sm text-center">
           <div className="bg-blue-50 rounded-xl p-2">
-            <p className="text-blue-600 font-semibold">{settings.dailyCarbTarget}g</p>
+            <p className="text-blue-600 font-semibold">{macroTargets.dailyCarbTarget}g</p>
             <p className="text-gray-500 text-xs">碳水</p>
           </div>
           <div className="bg-purple-50 rounded-xl p-2">
-            <p className="text-purple-600 font-semibold">{settings.dailyProteinTarget}g</p>
+            <p className="text-purple-600 font-semibold">{macroTargets.dailyProteinTarget}g</p>
             <p className="text-gray-500 text-xs">蛋白质</p>
           </div>
           <div className="bg-amber-50 rounded-xl p-2">
-            <p className="text-amber-600 font-semibold">{settings.dailyFatTarget}g</p>
+            <p className="text-amber-600 font-semibold">{macroTargets.dailyFatTarget}g</p>
             <p className="text-gray-500 text-xs">脂肪</p>
           </div>
         </div>

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { User } from 'lucide-react'
 import { getSettings, getDailyLog } from '@/lib/storage'
 import { UserSettings, DailyLog, MealType } from '@/lib/types'
+import { getMacroTargets } from '@/lib/calories'
 import CircularProgress from '@/components/CircularProgress'
 import MacroCard from '@/components/MacroCard'
 import MealSection from '@/components/MealSection'
@@ -58,12 +59,18 @@ export default function DashboardPage() {
     return <div className="flex items-center justify-center min-h-screen text-gray-400">加载中...</div>
   }
 
+  const macroTargets = getMacroTargets(settings)
+
   const totalCalories = log
     ? Object.values(log.meals).flat().reduce((sum, e) => sum + e.calories, 0)
     : 0
   const totalCarbs = log
     ? Object.values(log.meals).flat().reduce((sum, e) => sum + e.carbs, 0)
     : 0
+  const vegCarbs = log
+    ? Object.values(log.meals).flat().filter(e => e.foodCategory === 'vegetable').reduce((sum, e) => sum + e.carbs, 0)
+    : 0
+  const netCarbs = Math.round(totalCarbs - vegCarbs * 0.5)
   const totalProtein = log
     ? Object.values(log.meals).flat().reduce((sum, e) => sum + e.protein, 0)
     : 0
@@ -110,9 +117,9 @@ export default function DashboardPage() {
 
       {/* 宏量营养素 */}
       <div className="grid grid-cols-3 gap-3">
-        <MacroCard label="碳水" current={totalCarbs} target={settings.dailyCarbTarget} color="#3b82f6" />
-        <MacroCard label="蛋白质" current={totalProtein} target={settings.dailyProteinTarget} color="#8b5cf6" />
-        <MacroCard label="脂肪" current={totalFat} target={settings.dailyFatTarget} color="#f59e0b" />
+        <MacroCard label="碳水" current={netCarbs} target={macroTargets.dailyCarbTarget} color="#3b82f6" subtitle={`含蔬菜 ${Math.round(vegCarbs)}g`} />
+        <MacroCard label="蛋白质" current={totalProtein} target={macroTargets.dailyProteinTarget} color="#8b5cf6" />
+        <MacroCard label="脂肪" current={totalFat} target={macroTargets.dailyFatTarget} color="#f59e0b" />
       </div>
 
       {/* 饮水 */}
@@ -132,6 +139,7 @@ export default function DashboardPage() {
             entries={log?.meals[mealType] ?? []}
             date={selectedDate}
             onUpdate={loadData}
+            dietMode={settings.dietMode}
           />
         ))}
       </div>

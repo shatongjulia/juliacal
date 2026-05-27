@@ -21,6 +21,8 @@ function matchLocalFood(qwenName: string): LocalFood | null {
   return best
 }
 
+export const maxDuration = 10
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
   if (!body?.image || typeof body.image !== 'string') {
@@ -78,7 +80,7 @@ name字段要具体描述菜品（如"红烧肉"、"西红柿炒鸡蛋"、"蒜�
       },
       body: JSON.stringify({
         model: 'qwen3-vl-plus',
-        max_tokens: 800,
+        max_tokens: 400,
         messages: [
           {
             role: 'user',
@@ -90,7 +92,7 @@ name字段要具体描述菜品（如"红烧肉"、"西红柿炒鸡蛋"、"蒜�
         ],
         stream: false,
       }),
-      signal: AbortSignal.timeout(9000),
+      signal: AbortSignal.timeout(9500),
     })
 
     if (!response.ok) {

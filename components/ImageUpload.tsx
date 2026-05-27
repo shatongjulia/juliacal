@@ -92,8 +92,8 @@ export default function ImageUpload({ onResult, onError, disabled }: ImageUpload
   )
 }
 
-const MAX_DIM = 1000
-const JPEG_QUALITY = 0.75
+const MAX_DIM = 768
+const JPEG_QUALITY = 0.6
 
 function compressImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

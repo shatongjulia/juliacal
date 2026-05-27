@@ -164,3 +164,44 @@
     - Plan 模式纪律：多文件跨层改动进 Plan，小改直接做
     - Memory 提醒：主动提示用户将跨项目偏好写入全局 memory
 
+## 2026-05-27
+
+### 用餐时间可编辑
+
+27. **点击时间标签直接修改进餐时间**
+    - `components/MealSection.tsx` — 已记录的时间标签改为按钮，点击弹出 `time` 输入框
+    - 失焦/回车确认，Esc 取消；时钟按钮保留（覆盖为当前时间）
+
+### 饮食模式 UI 梳理
+
+28. **战役模式下弱化不相关字段**
+    - `app/profile/page.tsx` — 编辑态选战役模式时，目标和活动水平置灰禁用
+    - 小字说明：「由体重直接锚定，切回和平模式时保留此设置」
+    - 逻辑关系：和平模式 = 目标驱动（TDEE），战役模式 = 体重驱动（g/kg）
+
+### 空腹统计优化
+
+29. **16:8 达成率改为达成次数**
+    - `app/progress/page.tsx` — 显示从 `50%` 改为 `3/30天`
+    - 分母固定为 30（与「近30天」标题一致）
+    - `calcOvernightFasting` 新增 `hit16` 返回值
+
+### AI 搜索强化
+
+30. **Prompt 重写：中餐营养估算**
+    - `app/api/food/route.ts` — 去掉「不知道就返回 null」
+    - 加入中餐烹饪常识：炒/烧/炸/蒸/拌的脂肪范围，肉部位差异，食堂/外卖油量上浮
+    - AI 必须给出估算值，即使不完全确定
+
+31. **搜索结果来源标记**
+    - `components/FoodCard.tsx` — 新增 `source` prop，`source='ai'` 时显示紫色 `AI估算` 标签
+    - `app/search/page.tsx` — 传递 `source` 给 FoodCard
+
+### Git 备份体系
+
+32. **GitHub 远程仓库 + 两层备份策略**
+    - 远端：https://github.com/shatongjulia/juliacal
+    - 本地 commit：高频小步快照（功能跑通/切换 AI 前）
+    - GitHub push：阶段性推送（收工前/里程碑节点）
+    - 不影响 Vercel 部署（CLI 直连，不走 GitHub）
+

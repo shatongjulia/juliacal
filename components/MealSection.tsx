@@ -34,6 +34,7 @@ export default function MealSection({ mealType, entries, date, onUpdate, dietMod
   const [movingId, setMovingId] = useState<string | null>(null)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressTriggered = useRef(false)
+  const touchStartPos = useRef<{ x: number; y: number } | null>(null)
   const totalCalories = entries.reduce((sum, e) => sum + e.calories, 0)
   const show211 = mealType === 'lunch' || mealType === 'dinner'
   const assessment = show211 && entries.length >= 2 ? evaluate211(entries, mealType, dietMode) : null
@@ -105,15 +106,35 @@ export default function MealSection({ mealType, entries, date, onUpdate, dietMod
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
+    touchStartPos.current = null
   }
 
-  const handleLongPressStart = (id: string) => {
+  const handleTouchStart = (id: string, e: React.TouchEvent) => {
+    longPressTriggered.current = false
+    clearLongPress()
+    touchStartPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    longPressTimer.current = setTimeout(() => {
+      longPressTriggered.current = true
+      setMovingId(id)
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(15)
+    }, 600)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartPos.current) return
+    const dx = e.touches[0].clientX - touchStartPos.current.x
+    const dy = e.touches[0].clientY - touchStartPos.current.y
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+      clearLongPress()
+    }
+  }
+
+  const handleMouseDown = (id: string) => {
     longPressTriggered.current = false
     clearLongPress()
     longPressTimer.current = setTimeout(() => {
       longPressTriggered.current = true
       setMovingId(id)
-      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(15)
     }, 600)
   }
 
@@ -240,13 +261,14 @@ export default function MealSection({ mealType, entries, date, onUpdate, dietMod
             <li
               key={entry.id}
               className="flex items-center justify-between px-4 py-3 select-none active:bg-gray-50"
-              onTouchStart={() => handleLongPressStart(entry.id)}
-              onTouchMove={clearLongPress}
+              onTouchStart={(e) => handleTouchStart(entry.id, e)}
+              onTouchMove={handleTouchMove}
               onTouchEnd={clearLongPress}
-              onMouseDown={() => handleLongPressStart(entry.id)}
+              onMouseDown={() => handleMouseDown(entry.id)}
               onMouseUp={clearLongPress}
               onMouseLeave={clearLongPress}
               onContextMenu={e => e.preventDefault()}
+              onClick={() => { if (longPressTriggered.current) { longPressTriggered.current = false; return } }}
             >
               <div>
                 <p className="text-sm font-medium text-gray-800">

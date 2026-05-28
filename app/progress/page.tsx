@@ -312,7 +312,7 @@ export default function ProgressPage() {
               </div>
             </div>
             <p className="text-xs text-gray-400 mt-3">
-              基于 {fasting.count} 天晚餐→次日早餐的空腹时长统计
+              基于 {fasting.count} 天夜间空腹时长统计（前一天最晚进餐→次日最早进餐）
             </p>
           </>
         ) : (

@@ -10,7 +10,7 @@ import MacroCard from '@/components/MacroCard'
 import MealSection from '@/components/MealSection'
 import WaterTracker from '@/components/WaterTracker'
 
-const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack']
+const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'snack', 'dinner', 'nightsnack']
 
 function getGreeting(): string {
   const hour = new Date().getHours()

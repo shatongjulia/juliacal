@@ -141,6 +141,9 @@ export default function OnboardingPage() {
         dailyProteinTarget: targets.dailyProteinTarget,
         dailyFatTarget: targets.dailyFatTarget,
         dailyWaterTarget: targets.dailyWaterTarget,
+        weightHistory: [],
+        waistHistory: [],
+        waist: 0,
         onboardingComplete: true,
       }
       saveSettings(settings)

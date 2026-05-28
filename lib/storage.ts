@@ -4,11 +4,11 @@ const SETTINGS_KEY = 'juliaCal_settings'
 const VERSION_KEY = 'juliaCal_version'
 
 function emptyMeals(): DailyLog['meals'] {
-  return { breakfast: [], lunch: [], dinner: [], snack: [] }
+  return { breakfast: [], lunch: [], snack: [], dinner: [], nightsnack: [] }
 }
 
 function emptyMealTimes(): DailyLog['mealTimes'] {
-  return { breakfast: null, lunch: null, dinner: null, snack: null }
+  return { breakfast: null, lunch: null, snack: null, dinner: null, nightsnack: null }
 }
 
 function migrateIfNeeded() {

@@ -11,8 +11,9 @@ import ImageUpload, { AnalyzedFood } from './ImageUpload'
 const MEAL_LABELS: Record<MealType, string> = {
   breakfast: '早餐',
   lunch: '午餐',
-  dinner: '晚餐',
   snack: '零食',
+  dinner: '晚餐',
+  nightsnack: '夜宵',
 }
 
 interface MealSectionProps {
@@ -31,7 +32,7 @@ export default function MealSection({ mealType, entries, date, onUpdate, dietMod
   const timeInputRef = useRef<HTMLInputElement>(null)
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
   const totalCalories = entries.reduce((sum, e) => sum + e.calories, 0)
-  const show211 = mealType !== 'snack' && mealType !== 'breakfast'
+  const show211 = mealType === 'lunch' || mealType === 'dinner'
   const assessment = show211 && entries.length >= 2 ? evaluate211(entries, mealType, dietMode) : null
 
   const log = getDailyLog(date)

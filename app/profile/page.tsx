@@ -31,6 +31,22 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const s = getSettings()
+    if (s) {
+      let migrated = false
+      if (!s.weightHistory || s.weightHistory.length === 0) {
+        s.weightHistory = [{ date: new Date().toISOString().split('T')[0], value: s.weight }]
+        migrated = true
+      }
+      if (!s.waistHistory) {
+        s.waistHistory = []
+        migrated = true
+      }
+      if (s.waist === undefined) {
+        s.waist = 0
+        migrated = true
+      }
+      if (migrated) saveSettings(s)
+    }
     setSettings(s)
     if (s) setForm(s)
   }, [])
@@ -45,12 +61,14 @@ export default function ProfilePage() {
     const age = Number(form.age)
     const height = Number(form.height)
     const weight = Number(form.weight)
+    const waist = Number(form.waist)
     const target = Number(form.dailyCalorieTarget)
 
     if (!form.gender) newErrors.gender = '请选择性别'
     if (!age || age < 1 || age > 120) newErrors.age = '年龄 1-120'
     if (!height || height < 50 || height > 300) newErrors.height = '身高 50-300 cm'
     if (!weight || weight < 1 || weight > 500) newErrors.weight = '体重 1-500 kg'
+    if (waist > 0 && (waist < 40 || waist > 200)) newErrors.waist = '腰围 40-200 cm'
     if (!form.activityLevel) newErrors.activityLevel = '请选择活动水平'
     if (!form.goal) newErrors.goal = '请选择目标'
     if (target < 1000) newErrors.dailyCalorieTarget = '每日热量目标不低于 1000 kcal'
@@ -69,12 +87,36 @@ export default function ProfilePage() {
       dietMode,
     })
 
+    // 记录体重/腰围历史
+    const today = new Date().toISOString().split('T')[0]
+    const prevWeightHistory = settings?.weightHistory || []
+    const prevWaistHistory = settings?.waistHistory || []
+
+    const weightHistory = [...prevWeightHistory]
+    const existingWeight = weightHistory.find(h => h.date === today)
+    if (existingWeight) {
+      existingWeight.value = weight
+    } else {
+      weightHistory.push({ date: today, value: weight })
+    }
+
+    const waistHistory = [...prevWaistHistory]
+    if (waist > 0) {
+      const existingWaist = waistHistory.find(h => h.date === today)
+      if (existingWaist) {
+        existingWaist.value = waist
+      } else {
+        waistHistory.push({ date: today, value: waist })
+      }
+    }
+
     const updated: UserSettings = {
       ...settings!,
       ...form,
       age,
       height,
       weight,
+      waist: waist || settings!.waist || 0,
       gender: form.gender as 'male' | 'female',
       activityLevel: form.activityLevel as ActivityLevel,
       goal: form.goal as Goal,
@@ -84,6 +126,8 @@ export default function ProfilePage() {
       dailyProteinTarget: targets.dailyProteinTarget,
       dailyFatTarget: targets.dailyFatTarget,
       dailyWaterTarget: targets.dailyWaterTarget,
+      weightHistory,
+      waistHistory,
     }
 
     saveSettings(updated)
@@ -170,6 +214,20 @@ export default function ProfilePage() {
             </Field>
           )
         })}
+
+        <Field label="腰围（cm）">
+          {editing ? (
+            <input
+              type="number"
+              value={String(form.waist || '')}
+              step="0.1"
+              onChange={e => setForm(f => ({ ...f, waist: Number(e.target.value) }))}
+              className="input-field"
+            />
+          ) : (
+            <span>{settings.waist ? `${settings.waist} cm` : '未设置'}</span>
+          )}
+        </Field>
 
         <Field label="活动水平" error={errors.activityLevel}>
           {editing ? (

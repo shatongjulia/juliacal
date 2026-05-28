@@ -32,9 +32,91 @@ function calcStreak(logs: DailyLog[]): number {
   return streak
 }
 
+function TrendLine({ data, color, unit, label }: {
+  data: { date: string; value: number }[]
+  color: string
+  unit: string
+  label: string
+}) {
+  if (data.length < 2) {
+    return (
+      <div className="bg-white rounded-2xl shadow-sm p-5">
+        <h2 className="text-sm font-semibold text-gray-700 mb-3">{label}趋势</h2>
+        <p className="text-sm text-gray-400 text-center py-4">数据不足，记录两次以上后显示趋势</p>
+      </div>
+    )
+  }
+
+  const sorted = [...data].sort((a, b) => a.date.localeCompare(b.date))
+  const values = sorted.map(d => d.value)
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = max - min || 1
+  const pad = range * 0.2
+  const yMin = min - pad
+  const yMax = max + pad
+
+  const W = 320
+  const H = 160
+  const padX = 30
+  const padY = 20
+  const graphW = W - padX * 2
+  const graphH = H - padY * 2
+
+  const points = sorted.map((d, i) => {
+    const x = padX + (i / (sorted.length - 1)) * graphW
+    const y = padY + graphH - ((d.value - yMin) / (yMax - yMin)) * graphH
+    return `${x},${y}`
+  }).join(' ')
+
+  const latest = sorted[sorted.length - 1]
+  const first = sorted[0]
+  const delta = latest.value - first.value
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm p-5">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-semibold text-gray-700">{label}趋势</h2>
+        <span className={`text-xs font-medium ${delta < 0 ? 'text-green-500' : delta > 0 ? 'text-red-400' : 'text-gray-400'}`}>
+          {delta < 0 ? '↓' : delta > 0 ? '↑' : '→'} {Math.abs(delta).toFixed(1)}{unit}
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
+        {[0, 0.25, 0.5, 0.75, 1].map(frac => {
+          const y = padY + graphH * (1 - frac)
+          const val = yMin + (yMax - yMin) * frac
+          return (
+            <g key={frac}>
+              <line x1={padX} y1={y} x2={W - padX} y2={y} stroke="#f3f4f6" strokeWidth="1" />
+              <text x={padX - 4} y={y + 3} textAnchor="end" fontSize="9" fill="#9ca3af">
+                {val.toFixed(1)}
+              </text>
+            </g>
+          )
+        })}
+        <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        {sorted.map((d, i) => {
+          const x = padX + (i / (sorted.length - 1)) * graphW
+          const y = padY + graphH - ((d.value - yMin) / (yMax - yMin)) * graphH
+          return (
+            <g key={d.date}>
+              <circle cx={x} cy={y} r="4" fill="white" stroke={color} strokeWidth="2" />
+              <text x={x} y={H - 4} textAnchor="middle" fontSize="9" fill="#9ca3af">
+                {d.date.slice(5)}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
 export default function ProgressPage() {
   const settings = getSettings()
   const logs = getRecentLogs(30)
+  const weightHistory = settings?.weightHistory || []
+  const waistHistory = settings?.waistHistory || []
 
   if (!settings) {
     return <div className="flex items-center justify-center min-h-screen text-gray-400">加载中...</div>
@@ -43,7 +125,7 @@ export default function ProgressPage() {
   const macroTargets = getMacroTargets(settings)
 
   const weekDays = getWeekDays()
-  const emptyLog = (date: string): DailyLog => ({ date, meals: { breakfast: [], lunch: [], dinner: [], snack: [] }, water: 0, mealTimes: { breakfast: null, lunch: null, dinner: null, snack: null } })
+  const emptyLog = (date: string): DailyLog => ({ date, meals: { breakfast: [], lunch: [], snack: [], dinner: [], nightsnack: [] }, water: 0, mealTimes: { breakfast: null, lunch: null, snack: null, dinner: null, nightsnack: null } })
   const weekLogs = weekDays.map(date => logs.find(l => l.date === date) || emptyLog(date))
 
   const weekCalories = weekLogs.map(log => ({
@@ -94,15 +176,16 @@ export default function ProgressPage() {
     let count = 0
     let hit16 = 0
     for (let i = 1; i < sorted.length; i++) {
-      const prevDinner = sorted[i - 1].mealTimes.dinner
-      const todayBreakfast = sorted[i].mealTimes.breakfast
-      if (prevDinner && todayBreakfast) {
-        const h = (new Date(todayBreakfast).getTime() - new Date(prevDinner).getTime()) / (1000 * 60 * 60)
-        if (h > 0 && h < 24) {
-          totalH += h
-          count++
-          if (h >= 16) hit16++
-        }
+      const prevTimes = Object.values(sorted[i - 1].mealTimes).filter(Boolean) as string[]
+      const todayTimes = Object.values(sorted[i].mealTimes).filter(Boolean) as string[]
+      if (prevTimes.length === 0 || todayTimes.length === 0) continue
+      const lastMeal = Math.max(...prevTimes.map(t => new Date(t).getTime()))
+      const firstMeal = Math.min(...todayTimes.map(t => new Date(t).getTime()))
+      const h = (firstMeal - lastMeal) / (1000 * 60 * 60)
+      if (h > 0 && h < 24) {
+        totalH += h
+        count++
+        if (h >= 16) hit16++
       }
     }
     return { avg: count > 0 ? totalH / count : 0, rate16to8: count > 0 ? Math.round(hit16 / count * 100) : 0, count, hit16 }
@@ -159,6 +242,12 @@ export default function ProgressPage() {
         </div>
         <p className="text-xs text-gray-400 mt-2 text-right">虚线 = 每日目标 {settings.dailyCalorieTarget} kcal</p>
       </div>
+
+      {/* 体重趋势 */}
+      <TrendLine data={weightHistory} color="#0d9488" unit="kg" label="体重" />
+
+      {/* 腰围趋势 */}
+      <TrendLine data={waistHistory} color="#6366f1" unit="cm" label="腰围" />
 
       {/* 宏量达成率 */}
       <div className="bg-white rounded-2xl shadow-sm p-5">
@@ -246,7 +335,7 @@ export default function ProgressPage() {
           {MEAL_TYPES.map(m => {
             const entries = todayLog.meals[m]
             const result = entries.length >= 2 ? evaluate211(entries, m, settings.dietMode) : null
-            const labelMap: Record<MealType, string> = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '零食' }
+            const labelMap: Record<MealType, string> = { breakfast: '早餐', lunch: '午餐', snack: '零食', dinner: '晚餐', nightsnack: '夜宵' }
             const label = labelMap[m]
             return (
               <div

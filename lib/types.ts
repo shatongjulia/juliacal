@@ -3,7 +3,7 @@ export const STORAGE_VERSION = 1
 export type FoodCategory = 'protein' | 'vegetable' | 'carb' | 'fat' | 'other'
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active'
 export type Goal = 'lose' | 'maintain' | 'gain'
-export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
+export type MealType = 'breakfast' | 'lunch' | 'snack' | 'dinner' | 'nightsnack'
 export type DietMode = 'peace' | 'campaign'
 
 export interface UserSettings {
@@ -13,6 +13,7 @@ export interface UserSettings {
   age: number
   height: number
   weight: number
+  waist: number
   activityLevel: ActivityLevel
   goal: Goal
   dietMode: DietMode
@@ -21,6 +22,8 @@ export interface UserSettings {
   dailyProteinTarget: number
   dailyFatTarget: number
   dailyWaterTarget: number
+  weightHistory: { date: string; value: number }[]
+  waistHistory: { date: string; value: number }[]
   onboardingComplete: boolean
 }
 

@@ -205,3 +205,73 @@
     - GitHub push：阶段性推送（收工前/里程碑节点）
     - 不影响 Vercel 部署（CLI 直连，不走 GitHub）
 
+## 2026-05-28
+
+### 夜宵餐段
+
+33. **新增夜宵（nightsnack）餐段**
+    - `lib/types.ts` — MealType 新增 `'nightsnack'`
+    - 餐段排序：早餐 → 午餐 → 零食 → 晚餐 → 夜宵
+    - `lib/storage.ts` — emptyMeals/emptyMealTimes 补全 5 个餐段
+    - 夜宵不参与 211 评估（仅午/晚餐），不显示达标/未达标标签
+
+34. **空腹计算重写：全餐段时间窗**
+    - 旧：只取前一天晚餐 → 今天早餐
+    - 新：前一天所有餐段最晚时间 → 今天所有餐段最早时间
+    - 场景覆盖：有夜宵取夜宵，没早餐取午餐
+    - `app/progress/page.tsx` — `calcOvernightFasting` 用 `Math.max/min` 扫描全部 `mealTimes`
+
+### 体重 & 腰围趋势
+
+35. **体重/腰围趋势图**
+    - `app/progress/page.tsx` — SVG `TrendLine` 组件（折线+数据点+网格线+Y轴标签+变化方向）
+    - 体重（teal #0d9488）、腰围（indigo #6366f1）
+    - 数据不足 2 条时显示占位提示，右上角标注总变化量（↓↑→）
+
+36. **目标快照（targets snapshot）**
+    - `weightHistory` 从 `{ date, value }` 扩展为含完整目标快照
+    - 每条记录：weight + calorieTarget + carbTarget + proteinTarget + fatTarget + waterTarget
+    - 资料页每次保存自动记录，同天覆盖、新天追加
+    - 旧数据首次加载自动迁移（回填当前目标值）
+
+37. **资料页新增腰围字段**
+    - `app/profile/page.tsx` — 腰围输入框，步长 0.1cm，可选填
+    - UserSettings 新增 `waist`、`weightHistory`、`waistHistory`
+
+### 长按移动食物
+
+38. **长按食物条目移动到其他餐段**
+    - `components/MealSection.tsx` — 长按 600ms 触发，弹出"移动到"选择器
+    - 10px 移动阈值防止手指微抖取消长按
+    - haptic feedback（`navigator.vibrate`）
+    - 长按后自动屏蔽 click 防止误触
+
+### Bug 修复
+
+39. **getDailyLog 旧数据兼容**
+    - `lib/storage.ts` — 旧日志缺少 nightsnack 等新餐段键
+    - 加载时 `{ ...emptyMeals(), ...(parsed?.meals) }` 兜底补全
+    - 修复移动食物到夜宵时报错
+
+40. **长按移动触控阈值**
+    - 旧：`onTouchMove` 直接取消 → 手机上几乎无法触发长按
+    - 新：移动超过 10px 才取消，正常微抖不触发取消
+
+41. **空腹统计提示文字更新**
+    - "晚餐→次日早餐" → "前一天最晚进餐→次日最早进餐"（与计算逻辑一致）
+
+### 工程
+
+42. **Git 工作流纪律**
+    - commit / deploy / push 三道工序节奏分离
+    - commit：高频，功能跑通即做
+    - deploy：功能可验收时部署
+    - push：仅收工/里程碑，等确认
+
+### Skill 生态
+
+43. **办公四件套**
+    - 已安装：xlsx（之前），docx / pdf / pptx（本次补装），canvas-design
+    - 来源：Anthropic 官方 skills 仓库
+    - 场景：财报分析、尽调报告转 PPT 等
+

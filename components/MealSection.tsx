@@ -31,6 +31,9 @@ export default function MealSection({ mealType, entries, date, onUpdate, dietMod
   const [editingTime, setEditingTime] = useState(false)
   const timeInputRef = useRef<HTMLInputElement>(null)
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
+  const [movingId, setMovingId] = useState<string | null>(null)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressTriggered = useRef(false)
   const totalCalories = entries.reduce((sum, e) => sum + e.calories, 0)
   const show211 = mealType === 'lunch' || mealType === 'dinner'
   const assessment = show211 && entries.length >= 2 ? evaluate211(entries, mealType, dietMode) : null
@@ -95,6 +98,36 @@ export default function MealSection({ mealType, entries, date, onUpdate, dietMod
     saveDailyLog(log)
     setEditingId(null)
     onUpdate()
+  }
+
+  const clearLongPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
+
+  const handleLongPressStart = (id: string) => {
+    longPressTriggered.current = false
+    clearLongPress()
+    longPressTimer.current = setTimeout(() => {
+      longPressTriggered.current = true
+      setMovingId(id)
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(15)
+    }, 600)
+  }
+
+  const handleMove = (targetMeal: MealType) => {
+    if (!movingId) return
+    const log = getDailyLog(date)
+    const idx = log.meals[mealType].findIndex(e => e.id === movingId)
+    if (idx === -1) { setMovingId(null); return }
+    const [entry] = log.meals[mealType].splice(idx, 1)
+    log.meals[targetMeal] = [...log.meals[targetMeal], entry]
+    saveDailyLog(log)
+    setMovingId(null)
+    onUpdate()
+    showToast(`已移至${MEAL_LABELS[targetMeal]}`)
   }
 
   const handleDelete = (id: string) => {
@@ -204,7 +237,17 @@ export default function MealSection({ mealType, entries, date, onUpdate, dietMod
       {entries.length > 0 ? (
         <ul className="divide-y divide-gray-50">
           {entries.map(entry => (
-            <li key={entry.id} className="flex items-center justify-between px-4 py-3">
+            <li
+              key={entry.id}
+              className="flex items-center justify-between px-4 py-3 select-none active:bg-gray-50"
+              onTouchStart={() => handleLongPressStart(entry.id)}
+              onTouchMove={clearLongPress}
+              onTouchEnd={clearLongPress}
+              onMouseDown={() => handleLongPressStart(entry.id)}
+              onMouseUp={clearLongPress}
+              onMouseLeave={clearLongPress}
+              onContextMenu={e => e.preventDefault()}
+            >
               <div>
                 <p className="text-sm font-medium text-gray-800">
                   {entry.name}
@@ -248,6 +291,34 @@ export default function MealSection({ mealType, entries, date, onUpdate, dietMod
           {assessment.issues.map((issue, i) => (
             <p key={i} className="text-xs text-amber-600">{issue}</p>
           ))}
+        </div>
+      )}
+
+      {/* Move modal */}
+      {movingId && (
+        <div className="fixed inset-0 bg-black/40 flex items-end justify-center z-50 px-4 pb-8" onClick={() => setMovingId(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-semibold text-gray-700 mb-3">移动到</p>
+            <div className="space-y-2">
+              {(Object.keys(MEAL_LABELS) as MealType[])
+                .filter(m => m !== mealType)
+                .map(m => (
+                  <button
+                    key={m}
+                    onClick={() => handleMove(m)}
+                    className="w-full py-3 rounded-xl border border-gray-200 text-sm text-gray-700 hover:bg-green-50 hover:border-green-300 hover:text-green-700 transition-all"
+                  >
+                    {MEAL_LABELS[m]}
+                  </button>
+                ))}
+            </div>
+            <button
+              onClick={() => setMovingId(null)}
+              className="w-full mt-3 py-2 text-sm text-gray-400 hover:text-gray-600"
+            >
+              取消
+            </button>
+          </div>
         </div>
       )}
 

@@ -46,9 +46,9 @@ export function getDailyLog(date: string): DailyLog {
     const parsed = raw ? JSON.parse(raw) : null
     return {
       date,
-      meals: parsed?.meals ?? emptyMeals(),
+      meals: { ...emptyMeals(), ...(parsed?.meals) },
       water: parsed?.water ?? 0,
-      mealTimes: parsed?.mealTimes ?? emptyMealTimes(),
+      mealTimes: { ...emptyMealTimes(), ...(parsed?.mealTimes) },
     }
   } catch {
     return { date, meals: emptyMeals(), water: 0, mealTimes: emptyMealTimes() }

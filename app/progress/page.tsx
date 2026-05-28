@@ -244,7 +244,7 @@ export default function ProgressPage() {
       </div>
 
       {/* 体重趋势 */}
-      <TrendLine data={weightHistory} color="#0d9488" unit="kg" label="体重" />
+      <TrendLine data={weightHistory.map(h => ({ date: h.date, value: h.weight }))} color="#0d9488" unit="kg" label="体重" />
 
       {/* 腰围趋势 */}
       <TrendLine data={waistHistory} color="#6366f1" unit="cm" label="腰围" />

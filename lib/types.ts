@@ -22,7 +22,7 @@ export interface UserSettings {
   dailyProteinTarget: number
   dailyFatTarget: number
   dailyWaterTarget: number
-  weightHistory: { date: string; value: number }[]
+  weightHistory: { date: string; weight: number; calorieTarget: number; carbTarget: number; proteinTarget: number; fatTarget: number; waterTarget: number }[]
   waistHistory: { date: string; value: number }[]
   onboardingComplete: boolean
 }

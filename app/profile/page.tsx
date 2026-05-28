@@ -34,8 +34,31 @@ export default function ProfilePage() {
     if (s) {
       let migrated = false
       if (!s.weightHistory || s.weightHistory.length === 0) {
-        s.weightHistory = [{ date: new Date().toISOString().split('T')[0], value: s.weight }]
+        s.weightHistory = [{
+          date: new Date().toISOString().split('T')[0],
+          weight: s.weight,
+          calorieTarget: s.dailyCalorieTarget,
+          carbTarget: s.dailyCarbTarget,
+          proteinTarget: s.dailyProteinTarget,
+          fatTarget: s.dailyFatTarget,
+          waterTarget: s.dailyWaterTarget,
+        }]
         migrated = true
+      } else {
+        // 迁移旧格式 { date, value } → 新格式含目标快照
+        const first = s.weightHistory[0] as any
+        if ('value' in first && !('weight' in first)) {
+          s.weightHistory = s.weightHistory.map((h: any) => ({
+            date: h.date,
+            weight: h.value,
+            calorieTarget: s.dailyCalorieTarget,
+            carbTarget: s.dailyCarbTarget,
+            proteinTarget: s.dailyProteinTarget,
+            fatTarget: s.dailyFatTarget,
+            waterTarget: s.dailyWaterTarget,
+          }))
+          migrated = true
+        }
       }
       if (!s.waistHistory) {
         s.waistHistory = []
@@ -92,12 +115,26 @@ export default function ProfilePage() {
     const prevWeightHistory = settings?.weightHistory || []
     const prevWaistHistory = settings?.waistHistory || []
 
+    const finalCalorieTarget = calorieManuallySet ? target : targets.dailyCalorieTarget
     const weightHistory = [...prevWeightHistory]
     const existingWeight = weightHistory.find(h => h.date === today)
     if (existingWeight) {
-      existingWeight.value = weight
+      existingWeight.weight = weight
+      existingWeight.calorieTarget = finalCalorieTarget
+      existingWeight.carbTarget = targets.dailyCarbTarget
+      existingWeight.proteinTarget = targets.dailyProteinTarget
+      existingWeight.fatTarget = targets.dailyFatTarget
+      existingWeight.waterTarget = targets.dailyWaterTarget
     } else {
-      weightHistory.push({ date: today, value: weight })
+      weightHistory.push({
+        date: today,
+        weight,
+        calorieTarget: finalCalorieTarget,
+        carbTarget: targets.dailyCarbTarget,
+        proteinTarget: targets.dailyProteinTarget,
+        fatTarget: targets.dailyFatTarget,
+        waterTarget: targets.dailyWaterTarget,
+      })
     }
 
     const waistHistory = [...prevWaistHistory]

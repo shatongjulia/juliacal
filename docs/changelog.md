@@ -275,3 +275,32 @@
     - 来源：Anthropic 官方 skills 仓库
     - 场景：财报分析、尽调报告转 PPT 等
 
+## 2026-05-29
+
+### 云端同步
+
+44. **Vercel KV → Upstash Redis 云端数据同步**
+    - `app/api/sync/route.ts` — GET/POST 同步 API，6 位同步码鉴权（无注册）
+    - `@upstash/redis` SDK（Vercel Marketplace 集成），原 `@vercel/kv` 已废弃
+    - 同步码字符集排除 0/O/1/I 免混淆
+    - 首页静默自动备份 settings（`useEffect` POST 到 `/api/sync`）
+    - 资料页手动备份/恢复卡片：生成同步码 → 备份到云端 → 其他设备输入同步码恢复
+    - 环境变量：`KV_REST_API_URL` + `KV_REST_API_TOKEN`（Vercel Integration 自动注入）
+
+### 常吃食物快速添加
+
+45. **搜索页高频食物快捷入口**
+    - `app/search/page.tsx` — `getFrequentFoods()` 扫描 30 天日志
+    - 按出现次数排序，取最新一条的份量和 per100g，top 12
+    - 未输入搜索词时显示 chip 按钮列表，一键添加到当前餐段
+    - 添加时自动计算营养（份量 × per100g）
+
+### 月度报告导出
+
+46. **进度页 → 月度报告 Excel 导出**
+    - `app/report/page.tsx` — 月份 checkbox 选择器（从 localStorage 扫描可用月份）
+    - SheetJS (xlsx) 浏览器端生成三 sheet Excel：每日摘要、体重与腰围、月度汇总
+    - 每日摘要含 10 列：日期/热量/碳水/净碳水/蛋白质/脂肪/饮水/餐段数/午餐211/晚餐211
+    - 月度汇总含：记录天数/日均热量/日均三大宏量/211达标率
+    - `app/progress/page.tsx` 标题栏新增「导出报告」按钮
+

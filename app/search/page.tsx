@@ -3,8 +3,8 @@
 import { Suspense, useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Search, X } from 'lucide-react'
-import { MealType, MealEntry, FoodCategory } from '@/lib/types'
-import { getDailyLog, saveDailyLog } from '@/lib/storage'
+import { MealType, MealEntry, FoodCategory, DailyLog } from '@/lib/types'
+import { getDailyLog, saveDailyLog, getRecentLogs } from '@/lib/storage'
 import { inferFoodCategory } from '@/lib/diet211'
 import FoodCard from '@/components/FoodCard'
 
@@ -55,6 +55,57 @@ function SearchPageContent() {
   const showToast = (msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(null), 3000)
+  }
+
+  // 高频食物
+  const frequentFoods = (() => {
+    const logs = getRecentLogs(30)
+    const map = new Map<string, { name: string; amount: number; category: FoodCategory; per100g: NonNullable<MealEntry['per100g']>; count: number; latestDate: string }>()
+    for (const log of logs) {
+      for (const entry of Object.values(log.meals).flat()) {
+        const key = entry.name.trim()
+        const prev = map.get(key)
+        if (prev) {
+          prev.count++
+          if (entry.createdAt > prev.latestDate) {
+            prev.amount = entry.amount
+            prev.per100g = entry.per100g || prev.per100g
+            prev.latestDate = entry.createdAt
+          }
+        } else {
+          map.set(key, {
+            name: entry.name,
+            amount: entry.amount,
+            category: entry.foodCategory,
+            per100g: entry.per100g || { calories: entry.calories * 100 / entry.amount, carbs: entry.carbs * 100 / entry.amount, protein: entry.protein * 100 / entry.amount, fat: entry.fat * 100 / entry.amount },
+            count: 1,
+            latestDate: entry.createdAt,
+          })
+        }
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.count - a.count).slice(0, 12)
+  })()
+
+  const handleQuickAdd = (food: typeof frequentFoods[number]) => {
+    const ratio = food.amount / 100
+    const entry: MealEntry = {
+      id: crypto.randomUUID(),
+      name: food.name,
+      calories: Math.round(food.per100g.calories * ratio),
+      carbs: Math.round(food.per100g.carbs * ratio * 10) / 10,
+      protein: Math.round(food.per100g.protein * ratio * 10) / 10,
+      fat: Math.round(food.per100g.fat * ratio * 10) / 10,
+      amount: food.amount,
+      foodCategory: food.category,
+      source: 'search',
+      createdAt: new Date().toISOString(),
+      per100g: food.per100g,
+    }
+    const log = getDailyLog(date)
+    log.meals[selectedMeal] = [...log.meals[selectedMeal], entry]
+    saveDailyLog(log)
+    showToast(`已添加"${food.name}"(${food.amount}g)到${MEAL_LABELS[selectedMeal]}`)
   }
 
   const doSearch = useCallback(async (q: string) => {
@@ -148,6 +199,25 @@ function SearchPageContent() {
           添加食物到{MEAL_LABELS[meal]}
         </h1>
       </div>
+
+      {/* 常吃食物 */}
+      {frequentFoods.length > 0 && !query && (
+        <div>
+          <p className="text-xs text-gray-400 mb-2">常吃食物 · 点击快速添加</p>
+          <div className="flex flex-wrap gap-2">
+            {frequentFoods.map(f => (
+              <button
+                key={f.name}
+                onClick={() => handleQuickAdd(f)}
+                className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 hover:border-green-300 hover:bg-green-50 active:bg-green-100 transition-all"
+              >
+                {f.name}
+                <span className="ml-1 text-xs text-gray-400">{Math.round(f.amount)}g</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 搜索框 */}
       <div className="relative">

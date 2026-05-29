@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { UserSettings, ActivityLevel, Goal, DietMode } from '@/lib/types'
-import { getSettings, saveSettings, clearAllData } from '@/lib/storage'
+import { getSettings, saveSettings, clearAllData, getRecentLogs } from '@/lib/storage'
 import { buildUserTargets, getMacroTargets } from '@/lib/calories'
 
 const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
@@ -29,9 +29,27 @@ export default function ProfilePage() {
   const [toast, setToast] = useState<string | null>(null)
   const [calorieManuallySet, setCalorieManuallySet] = useState(false)
 
+  // 云同步状态
+  const [syncCode, setSyncCode] = useState('')
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState('')
+  const [inputCode, setInputCode] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  function generateSyncCode(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    let code = ''
+    for (let i = 0; i < 6; i++) {
+      code += chars[Math.floor(Math.random() * chars.length)]
+    }
+    return code
+  }
+
   useEffect(() => {
     const s = getSettings()
     if (s) {
+      const savedCode = (s as any).syncCode
+      if (savedCode) setSyncCode(savedCode)
       let migrated = false
       if (!s.weightHistory || s.weightHistory.length === 0) {
         s.weightHistory = [{
@@ -77,6 +95,96 @@ export default function ProfilePage() {
   const showToast = (msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(null), 3000)
+  }
+
+  // 云同步 handlers
+  const apiPost = async (code: string, type: string, data: unknown) => {
+    const res = await fetch('/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, type, data }),
+    })
+    if (!res.ok) throw new Error('网络错误')
+  }
+
+  const apiGet = async (code: string, type: string) => {
+    const res = await fetch(`/api/sync?code=${code}&type=${type}`)
+    if (!res.ok) throw new Error('网络错误')
+    return res.json()
+  }
+
+  const handleEnableSync = () => {
+    const code = generateSyncCode()
+    setSyncCode(code)
+    const s = getSettings()
+    if (s) {
+      (s as any).syncCode = code
+      saveSettings(s)
+    }
+    showToast('同步码已生成，请记下或截图保存')
+  }
+
+  const handleUpload = async () => {
+    setSyncing(true)
+    setSyncMsg('')
+    try {
+      const s = getSettings()
+      if (s) {
+        const clean = { ...s }
+        delete (clean as any).syncCode
+        await apiPost(syncCode, 'settings', clean)
+      }
+      const logs = getRecentLogs(30)
+      for (const log of logs) {
+        if (Object.values(log.meals).flat().length > 0 || log.water > 0) {
+          await apiPost(syncCode, `log_${log.date}`, log)
+        }
+      }
+      setSyncMsg('备份完成')
+    } catch { setSyncMsg('备份失败，请检查网络') }
+    finally { setSyncing(false) }
+  }
+
+  const handleDownload = async () => {
+    setSyncing(true)
+    setSyncMsg('')
+    try {
+      const { data: settings } = await apiGet(syncCode, 'settings')
+      if (settings) {
+        (settings as any).syncCode = syncCode
+        saveSettings(settings as UserSettings)
+      }
+      const { data: logs } = await apiGet(syncCode, 'logs')
+      if (logs) {
+        for (const [date, log] of Object.entries(logs)) {
+          localStorage.setItem(`juliaCal_log_${date}`, JSON.stringify(log))
+        }
+      }
+      setSyncMsg('恢复完成，请刷新页面')
+    } catch { setSyncMsg('恢复失败，请检查网络') }
+    finally { setSyncing(false) }
+  }
+
+  const handleRestore = async () => {
+    if (inputCode.length !== 6) return
+    setSyncing(true)
+    setSyncMsg('')
+    try {
+      const { data: settings } = await apiGet(inputCode, 'settings')
+      if (settings) {
+        (settings as any).syncCode = inputCode
+        saveSettings(settings as UserSettings)
+        setSyncCode(inputCode)
+      }
+      const { data: logs } = await apiGet(inputCode, 'logs')
+      if (logs) {
+        for (const [date, log] of Object.entries(logs)) {
+          localStorage.setItem(`juliaCal_log_${date}`, JSON.stringify(log))
+        }
+      }
+      setSyncMsg('恢复完成，请刷新页面')
+    } catch { setSyncMsg('恢复失败，检查同步码是否正确') }
+    finally { setSyncing(false) }
   }
 
   const handleSave = () => {
@@ -359,6 +467,59 @@ export default function ProfilePage() {
             <span>{settings.dietMode === 'campaign' ? '🔥 战役模式' : '🍃 和平模式'}</span>
           )}
         </Field>
+      </div>
+
+      {/* 云同步 */}
+      <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
+        <h2 className="text-sm font-semibold text-gray-700">云同步</h2>
+
+        {!syncCode ? (
+          <div>
+            <p className="text-xs text-gray-400 mb-2">开启同步后生成唯一同步码，换设备输入即可恢复数据</p>
+            <button onClick={handleEnableSync}
+              className="w-full py-3 bg-indigo-500 text-white rounded-xl text-sm font-medium">
+              开启云同步
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 bg-gray-50 rounded-xl p-3">
+              <span className="text-xs text-gray-500">你的同步码</span>
+              <code className="text-lg font-bold tracking-[0.3em] text-indigo-600">{syncCode}</code>
+              <button onClick={() => { navigator.clipboard.writeText(syncCode); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+                className="ml-auto text-xs text-indigo-500">
+                {copied ? '已复制' : '复制'}
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-400">请截图或记下此码。换设备时在下方输入并点击「恢复数据」</p>
+
+            <div className="flex gap-2">
+              <button onClick={handleUpload} disabled={syncing}
+                className="flex-1 py-2.5 bg-indigo-500 text-white rounded-xl text-sm font-medium disabled:opacity-50">
+                {syncing ? '同步中...' : '备份到云端'}
+              </button>
+              <button onClick={handleDownload} disabled={syncing}
+                className="flex-1 py-2.5 border border-indigo-300 text-indigo-600 rounded-xl text-sm font-medium disabled:opacity-50">
+                {syncing ? '同步中...' : '从云端恢复'}
+              </button>
+            </div>
+
+            <div className="border-t border-gray-100 pt-3 mt-3">
+              <p className="text-xs text-gray-400 mb-2">换设备？输入同步码恢复数据</p>
+              <div className="flex gap-2">
+                <input type="text" maxLength={6} placeholder="输入6位同步码"
+                  value={inputCode} onChange={e => setInputCode(e.target.value.toUpperCase())}
+                  className="flex-1 input-field tracking-[0.3em] text-center text-lg font-bold" />
+                <button onClick={handleRestore} disabled={inputCode.length !== 6 || syncing}
+                  className="px-4 py-2 bg-indigo-500 text-white rounded-xl text-sm disabled:opacity-50">
+                  恢复
+                </button>
+              </div>
+            </div>
+
+            {syncMsg && <p className={`text-xs ${syncMsg.includes('失败') ? 'text-red-500' : 'text-green-500'}`}>{syncMsg}</p>}
+          </>
+        )}
       </div>
 
       {/* 热量目标 */}

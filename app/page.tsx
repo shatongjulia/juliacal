@@ -55,6 +55,18 @@ export default function DashboardPage() {
     loadData()
   }, [loadData])
 
+  // 静默备份 Settings 到云端
+  useEffect(() => {
+    if (!settings) return
+    const code = (settings as any).syncCode as string | undefined
+    if (!code) return
+    fetch('/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, type: 'settings', data: settings }),
+    }).catch(() => {})
+  }, [settings])
+
   if (!settings) {
     return <div className="flex items-center justify-center min-h-screen text-gray-400">加载中...</div>
   }

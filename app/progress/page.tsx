@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { getSettings, getRecentLogs } from '@/lib/storage'
 import { DailyLog, MealType } from '@/lib/types'
 import { getMacroTargets } from '@/lib/calories'
@@ -113,6 +114,7 @@ function TrendLine({ data, color, unit, label }: {
 }
 
 export default function ProgressPage() {
+  const router = useRouter()
   const settings = getSettings()
   const logs = getRecentLogs(30)
   const weightHistory = settings?.weightHistory || []
@@ -198,7 +200,13 @@ export default function ProgressPage() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-xl font-bold text-gray-900">进度统计</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold text-gray-900">进度统计</h1>
+        <button onClick={() => router.push('/report')}
+          className="px-3 py-1.5 bg-indigo-50 text-indigo-600 text-sm rounded-xl border border-indigo-200 hover:bg-indigo-100 transition-colors">
+          导出报告
+        </button>
+      </div>
 
       {/* streak */}
       <div className="bg-white rounded-2xl shadow-sm p-5 flex items-center justify-between">
